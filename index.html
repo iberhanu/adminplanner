@@ -1,0 +1,2646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ADMIN PLANNER</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-primary: #0F172A;
+      --bg-secondary: #1E293B;
+      --bg-card: rgba(30, 41, 59, 0.8);
+      --border: rgba(255,255,255,0.06);
+      --text-primary: #E2E8F0;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --accent: #4ADE80;
+      --accent-secondary: #22D3EE;
+      --urgent: #DC2626;
+      --priority: #EA580C;
+      --in-progress: #2563EB;
+      --todo: #6B7280;
+      --done: #16A34A;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%); min-height: 100vh; color: var(--text-primary); overflow-x: hidden; }
+    .header { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 8px; }
+    .logo { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-tabs { display: flex; gap: 2px; background: rgba(255,255,255,0.03); padding: 3px; border-radius: 8px; }
+    .nav-tab { padding: 6px 10px; border-radius: 6px; border: none; background: transparent; color: var(--text-secondary); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .nav-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+    .nav-tab.active { background: rgba(74, 222, 128, 0.15); color: var(--accent); }
+    .header-actions { display: flex; gap: 6px; }
+    .header-btn { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--text-secondary); font-size: 10px; cursor: pointer; transition: all 0.2s; }
+    .header-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .braindump-container { padding: 16px; max-width: 800px; margin: 0 auto; }
+    .braindump-header { text-align: center; margin-bottom: 20px; }
+    .braindump-header h2 { font-size: 20px; margin-bottom: 8px; }
+    .braindump-header p { font-size: 13px; color: var(--text-muted); }
+    .braindump-input { width: 100%; min-height: 150px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 16px; color: var(--text-primary); font-size: 14px; font-family: inherit; resize: vertical; outline: none; }
+    .braindump-input:focus { border-color: var(--accent); }
+    .braindump-input::placeholder { color: var(--text-muted); }
+    .braindump-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .braindump-hint { font-size: 11px; color: var(--text-muted); }
+    .process-btn { padding: 12px 24px; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%); color: var(--bg-primary); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .process-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3); }
+    .process-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .processing-status { margin-top: 16px; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border); }
+    .status-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .status-dot.error { background: var(--urgent); animation: none; }
+    .status-dot.done { background: var(--done); animation: none; }
+    .status-text { font-size: 13px; }
+    .btn { padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-primary { background: var(--accent); color: var(--bg-primary); }
+    .btn-primary:hover { background: #22C55E; }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+    .btn-danger { background: rgba(220, 38, 38, 0.2); color: #FCA5A5; }
+    .btn-danger:hover { background: rgba(220, 38, 38, 0.3); }
+    .btn-sm { padding: 4px 8px; font-size: 10px; }
+    .search-container { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .search-bar { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); }
+    .search-bar input { background: transparent; border: none; color: var(--text-primary); font-size: 13px; width: 100%; outline: none; }
+    .search-bar input::placeholder { color: var(--text-muted); }
+    .board-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04); flex-wrap: wrap; gap: 8px; }
+    .board-title { font-size: 16px; font-weight: 600; }
+    .view-toggle { display: flex; gap: 2px; background: rgba(255,255,255,0.03); padding: 3px; border-radius: 6px; }
+    .view-btn { padding: 5px 10px; border-radius: 5px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 11px; transition: all 0.2s; }
+    .view-btn:hover { color: var(--text-secondary); }
+    .view-btn.active { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .kanban-container { display: flex; gap: 12px; padding: 16px; overflow-x: auto; min-height: calc(100vh - 280px); -webkit-overflow-scrolling: touch; scroll-behavior: smooth; cursor: grab; }
+    .kanban-container:active { cursor: grabbing; }
+    .bucket { background: rgba(255,255,255,0.02); border-radius: 10px; min-width: 280px; max-width: 280px; border: 1px solid var(--border); display: flex; flex-direction: column; max-height: calc(100vh - 180px); }
+    .bucket-header { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .bucket-name { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; }
+    .bucket-name:hover { background: rgba(255,255,255,0.05); }
+    .bucket-name-input { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(255,255,255,0.1); border: 1px solid var(--accent); border-radius: 4px; color: var(--text-primary); padding: 2px 4px; outline: none; width: 150px; }
+    .bucket-actions { display: flex; align-items: center; gap: 8px; }
+    .bucket-count { background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 10px; font-size: 10px; color: var(--text-muted); }
+    .bucket-delete { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; opacity: 0; transition: opacity 0.2s; }
+    .bucket-header:hover .bucket-delete { opacity: 1; }
+    .bucket-delete:hover { color: var(--urgent); }
+    .bucket-body { flex: 1; overflow-y: auto; padding: 8px; }
+    .add-task-inline { padding: 8px 10px; margin-bottom: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px dashed rgba(255,255,255,0.08); color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.2s; }
+    .add-task-inline:hover { background: rgba(255,255,255,0.04); }
+    .task-list { display: flex; flex-direction: column; gap: 8px; min-height: 50px; }
+    .task-list.drag-over { background: rgba(74, 222, 128, 0.05); border-radius: 6px; }
+    .add-bucket-column { min-width: 200px; max-width: 200px; background: rgba(255,255,255,0.01); border: 1px dashed var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; color: var(--text-muted); font-size: 13px; }
+    .add-bucket-column:hover { background: rgba(255,255,255,0.03); border-color: var(--accent); color: var(--accent); }
+    .task-card { background: var(--bg-card); border-radius: 8px; padding: 10px; border: 1px solid var(--border); border-left: 3px solid var(--todo); transition: all 0.2s; cursor: grab; }
+    .task-card:hover { background: rgba(30, 41, 59, 1); transform: translateY(-1px); }
+    .task-card.dragging { opacity: 0.5; }
+    .task-card.drag-above { border-top: 2px solid var(--accent); margin-top: -2px; }
+    .task-card.drag-below { border-bottom: 2px solid var(--accent); margin-bottom: -2px; }
+    .task-card.urgent { border-left-color: var(--urgent); }
+    .task-card.priority { border-left-color: var(--priority); }
+    .task-card.in-progress { border-left-color: var(--in-progress); }
+    .task-card.done { border-left-color: var(--done); opacity: 0.7; }
+    .task-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+    .task-title-row { display: flex; align-items: flex-start; gap: 6px; flex: 1; }
+    .expand-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 10px; }
+    .task-title { font-size: 12px; font-weight: 500; line-height: 1.4; }
+    .task-menu { color: var(--text-muted); opacity: 0; background: none; border: none; cursor: pointer; font-size: 14px; }
+    .task-card:hover .task-menu { opacity: 1; }
+    .checklist { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+    .checklist-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary); cursor: pointer; padding: 6px 8px; border-radius: 4px; transition: all 0.15s; margin: 0 -8px; }
+    .checklist-item:hover { background: rgba(255,255,255,0.05); }
+    .checklist-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; pointer-events: none; flex-shrink: 0; }
+    .checklist-item span { flex: 1; }
+    .checklist-item span.done { text-decoration: line-through; color: var(--text-muted); }
+    .checklist-item.completed { opacity: 0.6; background: rgba(22, 163, 74, 0.05); }
+    .checklist-item.completed:hover { opacity: 0.8; }
+    .task-footer { margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .task-meta { font-size: 10px; color: var(--text-muted); }
+    .due-date { font-size: 10px; padding: 2px 6px; background: rgba(255,255,255,0.05); border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; color: var(--text-muted); }
+    .due-date.overdue { background: rgba(220, 38, 38, 0.2); color: #FCA5A5; }
+    .status-badge { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; }
+    .status-badge.urgent { background: rgba(220, 38, 38, 0.2); color: #FCA5A5; }
+    .status-badge.priority { background: rgba(234, 88, 12, 0.2); color: #FDBA74; }
+    .status-badge.in-progress { background: rgba(37, 99, 235, 0.2); color: #93C5FD; }
+    .status-badge.todo { background: rgba(107, 114, 128, 0.2); color: #9CA3AF; }
+    .status-badge.done { background: rgba(22, 163, 74, 0.2); color: #86EFAC; }
+    .crm-container { padding: 16px; }
+    .crm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+    .crm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; flex: 1; }
+    .stat-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.2s; }
+    .stat-card:hover { background: rgba(255,255,255,0.06); border-color: var(--accent); }
+    .stat-card.active { background: rgba(74, 222, 128, 0.1); border-color: var(--accent); }
+    .crm-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: center; }
+    .crm-filter-bar select { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text-primary); font-size: 11px; outline: none; cursor: pointer; min-width: 120px; }
+    .crm-filter-bar select:focus { border-color: var(--accent); }
+    .crm-filter-bar select option { background: var(--bg-secondary); }
+    .filter-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-right: -4px; }
+    .filter-count { font-size: 10px; padding: 2px 8px; background: rgba(74, 222, 128, 0.2); color: var(--accent); border-radius: 10px; margin-left: auto; }
+    .clear-filters-btn { font-size: 11px; padding: 6px 10px; background: rgba(220, 38, 38, 0.1); color: #FCA5A5; border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .clear-filters-btn:hover { background: rgba(220, 38, 38, 0.2); }
+
+    /* Cloud Sync Indicator */
+    .sync-indicator { background: rgba(74, 222, 128, 0.15) !important; border-color: rgba(74, 222, 128, 0.3) !important; color: var(--accent) !important; }
+    .sync-indicator.syncing { animation: syncPulse 1s infinite; }
+    .sync-indicator.disconnected { background: rgba(107, 114, 128, 0.15) !important; border-color: rgba(107, 114, 128, 0.3) !important; color: var(--text-muted) !important; }
+    .sync-indicator.error { background: rgba(220, 38, 38, 0.15) !important; border-color: rgba(220, 38, 38, 0.3) !important; color: #FCA5A5 !important; }
+    @keyframes syncPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .sync-id-display { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; padding: 6px 10px; background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: 6px; color: var(--accent); letter-spacing: 1px; user-select: all; }
+    .device-count { font-size: 10px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+    .device-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .crm-actions { display: flex; gap: 8px; }
+    .contact-list { display: flex; flex-direction: column; gap: 8px; }
+    .contact-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; transition: all 0.2s; cursor: pointer; }
+    .contact-card:hover { background: rgba(255,255,255,0.04); }
+    .contact-avatar { width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--bg-primary); flex-shrink: 0; }
+    .contact-info { flex: 1; min-width: 0; }
+    .contact-name { font-size: 13px; font-weight: 500; }
+    .contact-detail { font-size: 11px; color: var(--text-muted); }
+    .contact-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+    .contact-tag { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-secondary); }
+    .contact-tag.geo { background: rgba(34, 211, 238, 0.15); color: #22D3EE; }
+    .contact-tag.sec { background: rgba(168, 85, 247, 0.15); color: #C084FC; }
+    .contact-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .next-step-badge { font-size: 10px; padding: 3px 8px; background: rgba(74, 222, 128, 0.15); color: var(--accent); border-radius: 4px; font-weight: 500; }
+    .next-step-badge.overdue { background: rgba(220, 38, 38, 0.15); color: #FCA5A5; }
+    .contact-date { font-size: 10px; color: var(--text-muted); font-family: 'SF Mono', Monaco, monospace; }
+    .today-container { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    @media (min-width: 768px) { .today-container { display: grid; grid-template-columns: 1fr 1fr; } }
+    .today-section { background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px solid var(--border); padding: 14px; max-height: 50vh; overflow-y: auto; }
+    .today-section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .count-badge { background: rgba(74, 222, 128, 0.2); color: var(--accent); padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+    .count-badge.urgent { background: rgba(220, 38, 38, 0.2); color: #FCA5A5; }
+    .empty-state { text-align: center; padding: 30px; color: var(--text-muted); font-size: 12px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+    .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 20px; width: 100%; max-width: 450px; max-height: 85vh; overflow-y: auto; }
+    .modal h3 { font-size: 16px; margin-bottom: 16px; }
+    .modal label { display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; }
+    .modal input[type="text"], .modal input[type="date"], .modal input[type="password"], .modal select, .modal textarea { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: var(--text-primary); font-size: 13px; margin-bottom: 12px; outline: none; font-family: inherit; }
+    .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--accent); }
+    .modal select option { background: var(--bg-secondary); color: var(--text-primary); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .checklist-editor { margin-bottom: 12px; }
+    .checklist-editor-title { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; }
+    .checklist-edit-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 4px; margin-bottom: 4px; }
+    .checklist-edit-item input[type="checkbox"] { accent-color: var(--accent); }
+    .checklist-edit-item span { flex: 1; font-size: 12px; }
+    .checklist-edit-item span.done { text-decoration: line-through; color: var(--text-muted); }
+    .checklist-edit-item button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 4px; }
+    .checklist-edit-item button:hover { color: var(--urgent); }
+    .add-checklist-row { display: flex; gap: 8px; margin-top: 8px; }
+    .add-checklist-row input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 4px; padding: 8px; color: var(--text-primary); font-size: 12px; outline: none; }
+    .add-checklist-row input:focus { border-color: var(--accent); }
+    .add-checklist-row button { background: var(--accent); color: var(--bg-primary); border: none; border-radius: 4px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--bg-secondary); border: 1px solid var(--accent); color: var(--text-primary); padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 1001; animation: slideUp 0.3s ease; }
+    @keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+    /* Phase 3: UI/UX Improvements */
+
+    /* Mobile touch targets - min 44px */
+    @media (max-width: 768px) {
+      .nav-tab { padding: 10px 14px; font-size: 12px; min-height: 44px; }
+      .header-btn { padding: 10px 12px; min-height: 44px; min-width: 44px; }
+      .btn { padding: 12px 18px; font-size: 13px; min-height: 44px; }
+      .btn-sm { padding: 10px 14px; min-height: 44px; }
+      .task-card { padding: 14px; }
+      .task-menu { padding: 8px; min-width: 44px; min-height: 44px; opacity: 1; }
+      .expand-btn { padding: 8px; min-width: 44px; min-height: 44px; }
+      .contact-card { padding: 16px; }
+      .checklist-item { padding: 8px 0; min-height: 44px; }
+      .modal { max-width: 100%; margin: 8px; padding: 16px; max-height: 90vh; }
+      .modal-overlay { padding: 8px; }
+      .add-task-inline { padding: 14px; min-height: 44px; }
+      .bucket-delete { padding: 8px; min-width: 44px; min-height: 44px; opacity: 1; }
+      .stat-card { padding: 16px; min-height: 70px; }
+      .crm-filter-bar { padding: 12px; }
+      .crm-filter-bar select { padding: 10px 12px; min-height: 44px; }
+      .clear-filters-btn { padding: 10px 14px; min-height: 44px; }
+      .search-bar { padding: 12px 14px; }
+      .search-bar input { font-size: 16px; } /* Prevent iOS zoom */
+    }
+
+    /* Better focus states for accessibility */
+    .btn:focus, .nav-tab:focus, .header-btn:focus, .modal input:focus, .modal select:focus, .modal textarea:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .task-card:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .contact-card:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .stat-card:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Smoother transitions */
+    .btn, .nav-tab, .header-btn, .task-card, .contact-card, .stat-card, .modal {
+      transition: all 0.2s ease-out;
+    }
+
+    /* Better hover feedback */
+    .btn:active { transform: scale(0.97); }
+    .task-card:active { transform: scale(0.99); }
+    .contact-card:active { transform: scale(0.99); }
+    .stat-card:active { transform: scale(0.97); }
+
+    /* Keyboard shortcut hints */
+    .keyboard-hint { font-size: 10px; color: var(--text-muted); opacity: 0.7; margin-left: 4px; }
+    @media (max-width: 768px) { .keyboard-hint { display: none; } }
+
+    /* Image drop zone for contact scanning */
+    .image-drop-zone { margin-top: 16px; padding: 24px; border: 2px dashed var(--border); border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.02); }
+    .image-drop-zone:hover { border-color: var(--accent); background: rgba(74, 222, 128, 0.05); }
+    .image-drop-zone.drag-over { border-color: var(--accent); background: rgba(74, 222, 128, 0.1); transform: scale(1.01); }
+    .image-drop-zone-icon { font-size: 32px; margin-bottom: 8px; }
+    .image-drop-zone-text { font-size: 13px; color: var(--text-secondary); }
+    .image-drop-zone-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    .image-preview-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    .image-preview-item { position: relative; width: 100px; height: 100px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+    .image-preview-item img { width: 100%; height: 100%; object-fit: cover; }
+    .image-preview-remove { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(220, 38, 38, 0.9); color: white; border: none; cursor: pointer; font-size: 12px; line-height: 20px; text-align: center; }
+    .image-preview-remove:hover { background: var(--urgent); }
+    .scan-contacts-btn { margin-top: 16px; padding: 12px 24px; border-radius: 8px; border: none; background: linear-gradient(135deg, #22D3EE 0%, #4ADE80 100%); color: var(--bg-primary); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .scan-contacts-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3); }
+    .scan-contacts-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .scan-warning { font-size: 11px; color: var(--priority); margin-top: 8px; }
+
+    /* Done button on task cards (Microsoft Planner style) */
+    .task-done-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--text-muted); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; margin-right: 8px; }
+    .task-done-btn:hover { border-color: var(--done); background: rgba(22, 163, 74, 0.1); }
+    .task-done-btn:hover::after { content: '✓'; color: var(--done); font-size: 14px; font-weight: bold; }
+    .task-card.done .task-done-btn { border-color: var(--done); background: var(--done); }
+    .task-card.done .task-done-btn::after { content: '✓'; color: white; font-size: 14px; font-weight: bold; }
+
+    /* Done tasks collapsible section */
+    .done-tasks-section { margin: 0 16px 16px; padding: 14px 16px; background: rgba(22, 163, 74, 0.05); border: 1px solid rgba(22, 163, 74, 0.2); border-radius: 10px; }
+    .done-tasks-header { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 4px 8px; margin: -4px -8px; border-radius: 6px; }
+    .done-tasks-header:hover { background: rgba(22, 163, 74, 0.1); }
+    .done-tasks-toggle { font-size: 12px; color: var(--done); transition: transform 0.2s; }
+    .done-tasks-toggle.expanded { transform: rotate(90deg); }
+    .done-tasks-title { font-size: 13px; font-weight: 600; color: var(--done); }
+    .done-tasks-count { font-size: 11px; padding: 3px 10px; background: rgba(22, 163, 74, 0.2); color: var(--done); border-radius: 10px; font-weight: 600; }
+    .done-tasks-list { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(22, 163, 74, 0.15); }
+    .done-tasks-list.expanded { display: flex; flex-wrap: wrap; gap: 8px; }
+    .done-task-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid var(--done); border-radius: 6px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; max-width: 300px; transition: all 0.2s; }
+    .done-task-card:hover { background: rgba(255,255,255,0.06); border-color: var(--done); }
+    .done-task-title { font-size: 12px; color: var(--text-secondary); text-decoration: line-through; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .done-task-undo { font-size: 10px; padding: 5px 10px; background: rgba(22, 163, 74, 0.15); border: none; border-radius: 4px; color: var(--done); cursor: pointer; font-weight: 500; }
+    .done-task-undo:hover { background: rgba(22, 163, 74, 0.25); }
+
+    /* Confirmation modal for contacts */
+    .confirm-contacts-list { max-height: 50vh; overflow-y: auto; margin: 16px 0; }
+    .confirm-contact-item { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+    .confirm-contact-item.selected { border-color: var(--accent); background: rgba(74, 222, 128, 0.05); }
+    .confirm-contact-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .confirm-contact-header input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+    .confirm-contact-name { font-weight: 600; font-size: 14px; flex: 1; }
+    .confirm-contact-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    .confirm-contact-badge.new { background: rgba(74, 222, 128, 0.2); color: var(--accent); }
+    .confirm-contact-badge.update { background: rgba(34, 211, 238, 0.2); color: var(--accent-secondary); }
+    .confirm-contact-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .confirm-contact-fields label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 2px; }
+    .confirm-contact-fields input { width: 100%; padding: 6px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 12px; }
+    .confirm-contact-fields input:focus { border-color: var(--accent); outline: none; }
+    .confirm-summary { font-size: 12px; color: var(--text-secondary); padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 12px; }
+
+    /* Inline editing styles */
+    .task-title-editable { cursor: text; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; }
+    .task-title-editable:hover { background: rgba(255,255,255,0.05); }
+    .task-title-input { background: rgba(255,255,255,0.1); border: 1px solid var(--accent); border-radius: 4px; color: var(--text-primary); font-size: 12px; font-weight: 500; padding: 4px 6px; outline: none; width: 100%; }
+
+    /* Unsaved changes indicator */
+    .modal.has-changes h3::after { content: ' •'; color: var(--accent); }
+
+    /* Confirmation dialog */
+    .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1100; }
+    .confirm-dialog { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-width: 320px; text-align: center; }
+    .confirm-dialog h4 { margin-bottom: 8px; font-size: 15px; }
+    .confirm-dialog p { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+    .confirm-dialog .btn-row { display: flex; gap: 8px; justify-content: center; }
+
+    /* Better empty states */
+    .empty-state { padding: 40px 20px; text-align: center; }
+    .empty-state-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+    .empty-state-text { font-size: 13px; color: var(--text-muted); }
+
+    /* Swipe indicator for mobile */
+    @media (max-width: 768px) {
+      .kanban-container::after {
+        content: '← Swipe →';
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        color: var(--text-muted);
+        opacity: 0.5;
+        pointer-events: none;
+      }
+    }
+  </style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+
+    // XSS Prevention utility
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Escape for use in HTML attribute values (double quotes)
+    function escapeAttr(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;');
+    }
+
+    const DEFAULT_CONTACTS = [
+      { id: 1, name: "Austin Smith", company: "DFC", role: "Investment Officer", geoTags: ["Ethiopia"], secTags: ["Development Finance"], nextStep: "", nextStepDate: "", strength: "Strong" },
+      { id: 2, name: "Dr. Girma Ababi", company: "Liyana Healthcare", role: "Founder", geoTags: ["Ethiopia"], secTags: ["Healthcare"], nextStep: "NDA signing", nextStepDate: "", strength: "New" }
+    ];
+    const DEFAULT_TASKS = [
+      { id: 1, title: "Home Grocery", bucket: "Work Admin", checklist: ["Milk", "Eggs", "Bread"], dueDate: "", status: "todo", notes: "" },
+      { id: 2, title: "TOMER FOLLOW UP", bucket: "LOGISTICS", checklist: ["List of companies"], dueDate: "2026-01-28", status: "urgent", notes: "" }
+    ];
+    const DEFAULT_BUCKETS = ["FUND", "HC - Sector", "LOGISTICS", "Work Admin"];
+
+    let state = {
+      view: 'kanban',
+      contacts: [],
+      tasks: [],
+      buckets: [],
+      filters: { search: '' },
+      // CRM filters
+      crmFilter: null, // null, 'all', 'overdue'
+      crmGeoFilter: '', // selected geo tag
+      crmSecFilter: '', // selected sector tag
+      crmStrengthFilter: '', // selected strength
+      crmLastContactedFilter: '', // 'week', 'month', '30days_ago', '90days_ago'
+      expandedTasks: new Set(),
+      modal: null,
+      modalChecklist: [],
+      newChecklistText: '',
+      toast: null,
+      apiKey: '',
+      editingBucket: null,
+      processing: null,
+      // Cloud sync (Firebase)
+      syncId: '',
+      syncStatus: null, // null, 'connecting', 'connected', 'syncing', 'error', 'disconnected'
+      lastSynced: null,
+      syncEnabled: false,
+      deviceCount: 0,
+      firebaseConfig: null,
+      // Legacy sync (kept for manual sync code copy)
+      autoSync: false,
+      // Brave Search API
+      braveApiKey: '',
+      // Image upload for contact scanning
+      uploadedImages: [],    // Array of {dataUrl, name} objects
+      pendingContacts: [],   // Contacts extracted, awaiting confirmation
+      selectedPendingContacts: new Set(), // IDs of contacts selected for import
+      // Done tasks visibility
+      showDoneTasks: false
+    };
+
+    function loadData() {
+      try {
+        const saved = localStorage.getItem('admin_planner_data_v4');
+        if (saved) {
+          const data = JSON.parse(saved);
+          state.contacts = Array.isArray(data.contacts) ? data.contacts : DEFAULT_CONTACTS;
+          state.tasks = Array.isArray(data.tasks) ? data.tasks : DEFAULT_TASKS;
+          state.buckets = Array.isArray(data.buckets) ? data.buckets : DEFAULT_BUCKETS;
+          state.apiKey = data.apiKey || '';
+          state.braveApiKey = data.braveApiKey || '';
+        } else {
+          state.contacts = [...DEFAULT_CONTACTS];
+          state.tasks = [...DEFAULT_TASKS];
+          state.buckets = [...DEFAULT_BUCKETS];
+        }
+      } catch (e) {
+        console.error('Failed to load data:', e);
+        state.contacts = [...DEFAULT_CONTACTS];
+        state.tasks = [...DEFAULT_TASKS];
+        state.buckets = [...DEFAULT_BUCKETS];
+        // Show error toast after render is available
+        setTimeout(() => {
+          showToast('Data load failed. Using defaults. Check Settings to import backup.');
+        }, 100);
+      }
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem('admin_planner_data_v4', JSON.stringify({
+          contacts: state.contacts,
+          tasks: state.tasks,
+          buckets: state.buckets,
+          apiKey: state.apiKey,
+          braveApiKey: state.braveApiKey
+        }));
+      } catch (e) {
+        console.error('Failed to save data:', e);
+        showToast('Save failed! Storage may be full. Export your data.');
+      }
+    }
+
+    function isOverdue(d) { return d && new Date(d) < new Date(new Date().toDateString()); }
+    function isToday(d) { return d && new Date(d).toDateString() === new Date().toDateString(); }
+    function formatDate(d) { return d ? new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }) : ''; }
+    function getInitials(n) { return n.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase(); }
+    function showToast(m) { state.toast = m; render(); setTimeout(() => { state.toast = null; render(); }, 3000); }
+    function getNextId(items) { return Math.max(0, ...items.map(i => i.id)) + 1; }
+    function filterTasks(tasks) { const s = state.filters.search.toLowerCase(); return s ? tasks.filter(t => t.title.toLowerCase().includes(s) || (t.checklist && t.checklist.some(c => c.toLowerCase().includes(s)))) : tasks; }
+    function getTasksByBucket(b) { return filterTasks(state.tasks.filter(t => t.bucket === b)); }
+    function getTodayItems() { return { tasks: state.tasks.filter(t => t.status === 'urgent' || isToday(t.dueDate) || isOverdue(t.dueDate)), contacts: state.contacts.filter(c => c.nextStep && (isToday(c.nextStepDate) || isOverdue(c.nextStepDate))) }; }
+
+    function setView(v) { state.view = v; render(); }
+    function handleSearch(v) { state.filters.search = v; render(); }
+
+    // CRM Filter functions
+    function setCrmFilter(f) {
+      state.crmFilter = state.crmFilter === f ? null : f;
+      render();
+    }
+
+    function setCrmGeoFilter(v) { state.crmGeoFilter = v; render(); }
+    function setCrmSecFilter(v) { state.crmSecFilter = v; render(); }
+    function setCrmStrengthFilter(v) { state.crmStrengthFilter = v; render(); }
+    function setCrmLastContactedFilter(v) { state.crmLastContactedFilter = v; render(); }
+
+    function clearAllCrmFilters() {
+      state.crmFilter = null;
+      state.crmGeoFilter = '';
+      state.crmSecFilter = '';
+      state.crmStrengthFilter = '';
+      state.crmLastContactedFilter = '';
+      state.filters.search = '';
+      render();
+    }
+
+    function getActiveFilterCount() {
+      let count = 0;
+      if (state.crmFilter) count++;
+      if (state.crmGeoFilter) count++;
+      if (state.crmSecFilter) count++;
+      if (state.crmStrengthFilter) count++;
+      if (state.crmLastContactedFilter) count++;
+      if (state.filters.search) count++;
+      return count;
+    }
+
+    function isWithinDays(dateStr, days) {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diff = (now - d) / (1000 * 60 * 60 * 24);
+      return diff <= days && diff >= 0;
+    }
+
+    function isOlderThanDays(dateStr, days) {
+      if (!dateStr) return true; // No date means never contacted
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diff = (now - d) / (1000 * 60 * 60 * 24);
+      return diff > days;
+    }
+
+    function filterContacts(contacts) {
+      return contacts.filter(c => {
+        // Search filter
+        const s = state.filters.search.toLowerCase();
+        if (s && !c.name.toLowerCase().includes(s) && !c.company.toLowerCase().includes(s)) {
+          return false;
+        }
+
+        // Stat card filter (Total/Overdue)
+        if (state.crmFilter === 'overdue' && !isOverdue(c.nextStepDate)) {
+          return false;
+        }
+
+        // Geo tag filter
+        if (state.crmGeoFilter && !(c.geoTags || []).includes(state.crmGeoFilter)) {
+          return false;
+        }
+
+        // Sector tag filter
+        if (state.crmSecFilter && !(c.secTags || []).includes(state.crmSecFilter)) {
+          return false;
+        }
+
+        // Strength filter
+        if (state.crmStrengthFilter && c.strength !== state.crmStrengthFilter) {
+          return false;
+        }
+
+        // Last contacted filter
+        if (state.crmLastContactedFilter) {
+          switch (state.crmLastContactedFilter) {
+            case 'week':
+              if (!isWithinDays(c.lastContactedDate, 7)) return false;
+              break;
+            case 'month':
+              if (!isWithinDays(c.lastContactedDate, 30)) return false;
+              break;
+            case '30days_ago':
+              if (!isOlderThanDays(c.lastContactedDate, 30)) return false;
+              break;
+            case '90days_ago':
+              if (!isOlderThanDays(c.lastContactedDate, 90)) return false;
+              break;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    function getUniqueGeoTags() {
+      return [...new Set(state.contacts.flatMap(c => c.geoTags || []))].sort();
+    }
+
+    function getUniqueSecTags() {
+      return [...new Set(state.contacts.flatMap(c => c.secTags || []))].sort();
+    }
+
+    function getUniqueStrengths() {
+      return [...new Set(state.contacts.map(c => c.strength).filter(Boolean))].sort();
+    }
+    function toggleTaskExpand(id) { state.expandedTasks.has(id) ? state.expandedTasks.delete(id) : state.expandedTasks.add(id); render(); }
+
+    function markTaskDone(taskId, e) {
+      if (e) e.stopPropagation();
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.status = task.status === 'done' ? 'todo' : 'done';
+        saveData();
+        render();
+        if (task.status === 'done') {
+          showToast('Task completed!');
+        }
+      }
+    }
+
+    function toggleDoneTasksVisibility() {
+      state.showDoneTasks = !state.showDoneTasks;
+      render();
+    }
+
+    function getDoneTasks() {
+      return state.tasks.filter(t => t.status === 'done');
+    }
+
+    function getActiveTasks() {
+      return state.tasks.filter(t => t.status !== 'done');
+    }
+
+    function toggleChecklistItem(taskId, idx, e) {
+      e.stopPropagation();
+      const t = state.tasks.find(x => x.id === taskId);
+      if (t && t.checklist) {
+        const item = t.checklist[idx];
+        // Toggle the checked state
+        t.checklist[idx] = item.startsWith('[x] ') ? item.replace('[x] ', '') : '[x] ' + item;
+        // Sort checklist: unchecked items first, checked items at bottom
+        t.checklist = sortChecklist(t.checklist);
+        saveData();
+        render();
+      }
+    }
+
+    function sortChecklist(checklist) {
+      // Separate completed and incomplete items
+      const incomplete = checklist.filter(item => !item.startsWith('[x] '));
+      const complete = checklist.filter(item => item.startsWith('[x] '));
+      // Return incomplete first, then complete
+      return [...incomplete, ...complete];
+    }
+    
+    function addNewBucket() {
+      const n = prompt('New bucket name:');
+      if (n && n.trim()) {
+        const trimmed = n.trim();
+        // Check for duplicate bucket names
+        if (state.buckets.some(b => b.toLowerCase() === trimmed.toLowerCase())) {
+          showToast('Bucket "' + trimmed + '" already exists');
+          return;
+        }
+        state.buckets.push(trimmed);
+        saveData();
+        render();
+        showToast('Bucket created');
+      }
+    }
+
+    function startRenameBucket(b) {
+      state.editingBucket = b;
+      render();
+      setTimeout(() => {
+        const i = document.getElementById('bucketNameInput');
+        if (i) { i.focus(); i.select(); }
+      }, 50);
+    }
+
+    function finishRenameBucket(old, neu) {
+      if (neu && neu.trim() && neu !== old) {
+        const trimmed = neu.trim();
+        // Check for empty name
+        if (!trimmed) {
+          showToast('Bucket name cannot be empty');
+          state.editingBucket = null;
+          render();
+          return;
+        }
+        // Check for duplicate bucket names (excluding current bucket)
+        if (state.buckets.some(b => b !== old && b.toLowerCase() === trimmed.toLowerCase())) {
+          showToast('Bucket "' + trimmed + '" already exists');
+          state.editingBucket = null;
+          render();
+          return;
+        }
+        const i = state.buckets.indexOf(old);
+        if (i !== -1) {
+          state.buckets[i] = trimmed;
+          state.tasks.forEach(t => { if (t.bucket === old) t.bucket = trimmed; });
+          saveData();
+        }
+      }
+      state.editingBucket = null;
+      render();
+    }
+
+    function deleteBucket(b) {
+      const tasksInBucket = state.tasks.filter(t => t.bucket === b).length;
+      const message = tasksInBucket > 0
+        ? 'Delete bucket "' + b + '"? ' + tasksInBucket + ' task(s) will be moved to "Work Admin".'
+        : 'Delete bucket "' + b + '"?';
+
+      if (confirm(message)) {
+        // Find a valid target bucket for reassignment
+        let targetBucket = 'Work Admin';
+        if (!state.buckets.includes(targetBucket)) {
+          // If Work Admin doesn't exist, use first available bucket (excluding the one being deleted)
+          targetBucket = state.buckets.find(x => x !== b);
+          if (!targetBucket) {
+            // If no other buckets, create Work Admin
+            state.buckets.push('Work Admin');
+            targetBucket = 'Work Admin';
+          }
+        }
+
+        state.tasks.forEach(t => { if (t.bucket === b) t.bucket = targetBucket; });
+        state.buckets = state.buckets.filter(x => x !== b);
+        saveData();
+        render();
+        showToast('Bucket deleted');
+      }
+    }
+
+    // Drag and drop with reorder support
+    let draggedTaskId = null;
+    let dragOverTaskId = null;
+    let dragPosition = null;
+
+    function handleDragStart(e, id) { 
+      draggedTaskId = id; 
+      e.target.classList.add('dragging'); 
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function handleDragEnd(e) { 
+      e.target.classList.remove('dragging'); 
+      document.querySelectorAll('.task-card').forEach(el => el.classList.remove('drag-above', 'drag-below'));
+      document.querySelectorAll('.task-list').forEach(el => el.classList.remove('drag-over')); 
+      draggedTaskId = null;
+      dragOverTaskId = null;
+      dragPosition = null;
+    }
+    
+    function handleTaskDragOver(e, taskId) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (taskId === draggedTaskId) return;
+      
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const pos = e.clientY < midY ? 'above' : 'below';
+      
+      if (dragOverTaskId !== taskId || dragPosition !== pos) {
+        document.querySelectorAll('.task-card').forEach(el => el.classList.remove('drag-above', 'drag-below'));
+        e.currentTarget.classList.add('drag-' + pos);
+        dragOverTaskId = taskId;
+        dragPosition = pos;
+      }
+    }
+    
+    function handleTaskDrop(e, targetTaskId, bucket) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!draggedTaskId || draggedTaskId === targetTaskId) return;
+
+      // Validate dragged task exists
+      const draggedTask = state.tasks.find(t => t.id === draggedTaskId);
+      if (!draggedTask) {
+        // Reset drag state
+        draggedTaskId = null;
+        dragOverTaskId = null;
+        dragPosition = null;
+        return;
+      }
+
+      // Remove from current position
+      state.tasks = state.tasks.filter(t => t.id !== draggedTaskId);
+
+      // Update bucket
+      draggedTask.bucket = bucket;
+
+      // Find target index and insert
+      const targetIdx = state.tasks.findIndex(t => t.id === targetTaskId);
+
+      // Handle targetIdx === -1 gracefully (target not found, append to end)
+      if (targetIdx === -1) {
+        state.tasks.push(draggedTask);
+      } else {
+        const insertIdx = dragPosition === 'below' ? targetIdx + 1 : targetIdx;
+        state.tasks.splice(insertIdx, 0, draggedTask);
+      }
+
+      saveData();
+      render();
+    }
+    
+    function handleBucketDragOver(e) { 
+      e.preventDefault(); 
+      e.currentTarget.classList.add('drag-over'); 
+    }
+    
+    function handleBucketDragLeave(e) { 
+      e.currentTarget.classList.remove('drag-over'); 
+    }
+    
+    function handleBucketDrop(e, bucket) { 
+      e.preventDefault(); 
+      e.currentTarget.classList.remove('drag-over');
+      
+      if (!draggedTaskId) return;
+      
+      // If dropped on empty area (not on a task), add to end
+      if (!dragOverTaskId) {
+        const task = state.tasks.find(t => t.id === draggedTaskId);
+        if (task) {
+          task.bucket = bucket;
+          saveData();
+        }
+      }
+      
+      render();
+    }
+
+    // Modals
+    function openAddTaskModal(b) { 
+      state.modal = { type: 'addTask', bucket: b }; 
+      state.modalChecklist = [];
+      state.newChecklistText = '';
+      render(); 
+    }
+    
+    function openEditTaskModal(id) { 
+      const t = state.tasks.find(x => x.id === id); 
+      if (t) { 
+        state.modal = { type: 'editTask', task: JSON.parse(JSON.stringify(t)) }; 
+        state.modalChecklist = [...(t.checklist || [])];
+        state.newChecklistText = '';
+        render(); 
+      } 
+    }
+    
+    function openAddContactModal() { state.modal = { type: 'addContact' }; render(); }
+    function openEditContactModal(id) { const c = state.contacts.find(x => x.id === id); if (c) { state.modal = { type: 'editContact', contact: JSON.parse(JSON.stringify(c)) }; render(); } }
+    function openSettingsModal() { state.modal = { type: 'settings' }; render(); }
+    function closeModal() { state.modal = null; state.modalChecklist = []; state.newChecklistText = ''; render(); }
+
+    // Checklist editing in modal
+    function addChecklistItem() {
+      const input = document.getElementById('newChecklistInput');
+      const text = input ? input.value.trim() : '';
+      if (text) {
+        state.modalChecklist.push(text);
+        state.newChecklistText = '';
+        render();
+        setTimeout(() => {
+          const newInput = document.getElementById('newChecklistInput');
+          if (newInput) newInput.focus();
+        }, 50);
+      }
+    }
+    
+    function removeChecklistItem(idx) {
+      state.modalChecklist.splice(idx, 1);
+      render();
+    }
+    
+    function toggleModalChecklistItem(idx) {
+      const item = state.modalChecklist[idx];
+      state.modalChecklist[idx] = item.startsWith('[x] ') ? item.replace('[x] ', '') : '[x] ' + item;
+      render();
+    }
+
+    function saveTask() { 
+      const title = document.getElementById('taskTitle').value.trim(); 
+      if (!title) return; 
+      
+      if (state.modal.type === 'addTask') { 
+        state.tasks.push({ 
+          id: getNextId(state.tasks), 
+          title, 
+          bucket: state.modal.bucket, 
+          checklist: [...state.modalChecklist], 
+          dueDate: document.getElementById('taskDueDate').value || '', 
+          status: document.getElementById('taskStatus').value || 'todo', 
+          notes: document.getElementById('taskNotes') ? document.getElementById('taskNotes').value : '' 
+        }); 
+      } else { 
+        const t = state.tasks.find(x => x.id === state.modal.task.id); 
+        if (t) { 
+          t.title = title; 
+          t.bucket = document.getElementById('taskBucket').value; 
+          t.checklist = [...state.modalChecklist];
+          t.dueDate = document.getElementById('taskDueDate').value || ''; 
+          t.status = document.getElementById('taskStatus').value; 
+          t.notes = document.getElementById('taskNotes') ? document.getElementById('taskNotes').value : '';
+        } 
+      } 
+      saveData(); 
+      closeModal(); 
+      showToast('Task saved!'); 
+    }
+    
+    function deleteTask() {
+      const task = state.modal.task;
+      const hasChecklist = task.checklist && task.checklist.length > 0;
+      const message = hasChecklist
+        ? 'Delete "' + task.title + '"? This task has ' + task.checklist.length + ' checklist item(s).'
+        : 'Delete "' + task.title + '"?';
+
+      if (confirm(message)) {
+        state.tasks = state.tasks.filter(t => t.id !== task.id);
+        saveData();
+        closeModal();
+        showToast('Task deleted');
+      }
+    }
+    
+    function parseTagsInput(value) {
+      return value.split(',').map(t => t.trim()).filter(t => t.length > 0);
+    }
+
+    function saveContact() {
+      const name = document.getElementById('contactName').value.trim();
+      if (!name) return;
+
+      const geoTags = parseTagsInput(document.getElementById('contactGeoTags').value);
+      const secTags = parseTagsInput(document.getElementById('contactSecTags').value);
+      const strength = document.getElementById('contactStrength').value || 'New';
+      const lastContactedDate = document.getElementById('contactLastContacted').value || '';
+
+      if (state.modal.type === 'addContact') {
+        state.contacts.push({
+          id: getNextId(state.contacts),
+          name,
+          company: document.getElementById('contactCompany').value || '',
+          role: document.getElementById('contactRole').value || '',
+          geoTags,
+          secTags,
+          nextStep: document.getElementById('contactNextStep').value || '',
+          nextStepDate: document.getElementById('contactNextStepDate').value || '',
+          strength,
+          lastContactedDate
+        });
+      } else {
+        const c = state.contacts.find(x => x.id === state.modal.contact.id);
+        if (c) {
+          c.name = name;
+          c.company = document.getElementById('contactCompany').value || '';
+          c.role = document.getElementById('contactRole').value || '';
+          c.geoTags = geoTags;
+          c.secTags = secTags;
+          c.nextStep = document.getElementById('contactNextStep').value || '';
+          c.nextStepDate = document.getElementById('contactNextStepDate').value || '';
+          c.strength = strength;
+          c.lastContactedDate = lastContactedDate;
+        }
+      }
+      saveData();
+      closeModal();
+      showToast('Contact saved!');
+    }
+    
+    function deleteContact() {
+      const contact = state.modal.contact;
+      const message = 'Delete "' + contact.name + '"' + (contact.company ? ' from ' + contact.company : '') + '?';
+
+      if (confirm(message)) {
+        state.contacts = state.contacts.filter(c => c.id !== contact.id);
+        saveData();
+        closeModal();
+        showToast('Contact deleted');
+      }
+    }
+    
+    function saveApiKey() {
+      state.apiKey = document.getElementById('apiKeyInput').value.trim();
+      const braveInput = document.getElementById('braveApiKeyInput');
+      if (braveInput) state.braveApiKey = braveInput.value.trim();
+      saveData();
+      closeModal();
+      showToast('API keys saved!');
+    }
+    
+    // Export functions
+    function exportContactsCSV() {
+      // Export filtered results (context-aware)
+      const contactsToExport = filterContacts(state.contacts);
+      const headers = ['Name', 'Company', 'Role', 'Next Step', 'Next Step Date', 'Last Contacted', 'Strength', 'Geo Tags', 'Sector Tags'];
+      const rows = contactsToExport.map(c => [
+        c.name,
+        c.company,
+        c.role,
+        c.nextStep || '',
+        c.nextStepDate || '',
+        c.lastContactedDate || '',
+        c.strength || '',
+        (c.geoTags || []).join('; '),
+        (c.secTags || []).join('; ')
+      ]);
+
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(','))
+        .join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filterSuffix = getActiveFilterCount() > 0 ? '_filtered' : '';
+      a.download = 'CRM_Contacts' + filterSuffix + '_' + new Date().toISOString().split('T')[0] + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      const filterMsg = getActiveFilterCount() > 0 ? ' (' + contactsToExport.length + ' filtered contacts)' : '';
+      showToast('Contacts exported to CSV!' + filterMsg);
+    }
+    
+    function exportToJSON() { 
+      const blob = new Blob([JSON.stringify({ contacts: state.contacts, tasks: state.tasks, buckets: state.buckets }, null, 2)], { type: 'application/json' }); 
+      const a = document.createElement('a'); 
+      a.href = URL.createObjectURL(blob); 
+      a.download = 'Admin_Planner_Backup.json'; 
+      a.click(); 
+      showToast('Exported!'); 
+    }
+    
+    function importFromJSON() { 
+      const input = document.createElement('input'); 
+      input.type = 'file'; 
+      input.accept = '.json'; 
+      input.onchange = e => { 
+        const f = e.target.files[0]; 
+        if (!f) return; 
+        const r = new FileReader(); 
+        r.onload = ev => { 
+          try { 
+            const d = JSON.parse(ev.target.result); 
+            if (d.contacts) state.contacts = d.contacts; 
+            if (d.tasks) state.tasks = d.tasks; 
+            if (d.buckets) state.buckets = d.buckets; 
+            saveData(); 
+            render(); 
+            showToast('Imported!'); 
+          } catch (err) { showToast('Failed: ' + err.message); } 
+        }; 
+        r.readAsText(f); 
+      }; 
+      input.click(); 
+    }
+    
+    function copyDataToClipboard() { 
+      const data = { contacts: state.contacts, tasks: state.tasks, buckets: state.buckets, apiKey: state.apiKey }; 
+      navigator.clipboard.writeText(btoa(encodeURIComponent(JSON.stringify(data)))).then(() => showToast('Copied!')).catch(() => prompt('Copy:', btoa(encodeURIComponent(JSON.stringify(data))))); 
+    }
+    
+    function pasteDataFromClipboard() { 
+      const code = prompt('Paste sync code:'); 
+      if (!code) return; 
+      try { 
+        const data = JSON.parse(decodeURIComponent(atob(code.trim()))); 
+        state.contacts = data.contacts || []; 
+        state.tasks = data.tasks || []; 
+        state.buckets = data.buckets || DEFAULT_BUCKETS; 
+        state.apiKey = data.apiKey || ''; 
+        saveData(); 
+        render(); 
+        showToast('Synced!'); 
+      } catch (e) { showToast('Invalid code'); } 
+    }
+
+    // ========== FIREBASE CLOUD SYNC ==========
+    let firebaseApp = null;
+    let firebaseDb = null;
+    let firebaseListener = null;
+    let isReceivingUpdate = false; // Prevent sync loops
+    let syncDebounceTimer = null;
+
+    // Generate 8-character alphanumeric Sync ID
+    function generateSyncId() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous chars (0, O, 1, I, l)
+      let id = '';
+      for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return id;
+    }
+
+    function getSyncData() {
+      return {
+        contacts: state.contacts,
+        tasks: state.tasks,
+        buckets: state.buckets,
+        lastModified: Date.now(),
+        version: 2
+      };
+    }
+
+    // Initialize Firebase with user's config
+    function initializeFirebase(config) {
+      try {
+        if (firebaseApp) {
+          // Already initialized
+          return true;
+        }
+
+        // Validate config
+        if (!config || !config.databaseURL || !config.apiKey) {
+          throw new Error('Invalid Firebase config. Need apiKey and databaseURL.');
+        }
+
+        firebaseApp = firebase.initializeApp(config);
+        firebaseDb = firebase.database();
+        state.firebaseConfig = config;
+        saveFirebaseConfig();
+        return true;
+      } catch (err) {
+        console.error('Firebase init error:', err);
+        showToast('Firebase init failed: ' + err.message);
+        return false;
+      }
+    }
+
+    // Create new Sync ID and push initial data
+    async function createNewSync() {
+      if (!firebaseDb) {
+        showToast('Configure Firebase first');
+        return;
+      }
+
+      const newSyncId = generateSyncId();
+      state.syncStatus = 'syncing';
+      render();
+
+      try {
+        const ref = firebaseDb.ref('planners/' + newSyncId);
+        await ref.set({
+          ...getSyncData(),
+          createdAt: Date.now(),
+          deviceCount: 1
+        });
+
+        state.syncId = newSyncId;
+        state.syncEnabled = true;
+        state.lastSynced = new Date().toISOString();
+        state.syncStatus = 'connected';
+        state.deviceCount = 1;
+        saveSyncSettings();
+
+        // Start real-time listener
+        startRealtimeSync();
+
+        render();
+        showToast('Sync created! Your Sync ID: ' + newSyncId);
+
+      } catch (err) {
+        console.error('Create sync error:', err);
+        state.syncStatus = 'error';
+        render();
+        showToast('Failed to create sync: ' + err.message);
+      }
+    }
+
+    // Join existing Sync ID
+    async function joinSyncId(syncId) {
+      if (!firebaseDb) {
+        showToast('Configure Firebase first');
+        return;
+      }
+
+      const cleanId = syncId.trim().toUpperCase();
+      if (cleanId.length !== 8) {
+        showToast('Sync ID must be 8 characters');
+        return;
+      }
+
+      state.syncStatus = 'connecting';
+      render();
+
+      try {
+        const ref = firebaseDb.ref('planners/' + cleanId);
+        const snapshot = await ref.once('value');
+
+        if (!snapshot.exists()) {
+          throw new Error('Sync ID not found. Check the code and try again.');
+        }
+
+        const data = snapshot.val();
+
+        // Validate data structure
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid sync data');
+        }
+
+        // Apply remote data
+        if (Array.isArray(data.contacts)) state.contacts = data.contacts;
+        if (Array.isArray(data.tasks)) state.tasks = data.tasks;
+        if (Array.isArray(data.buckets) && data.buckets.length > 0) state.buckets = data.buckets;
+
+        // Update device count
+        const newDeviceCount = (data.deviceCount || 1) + 1;
+        await ref.update({ deviceCount: newDeviceCount });
+
+        state.syncId = cleanId;
+        state.syncEnabled = true;
+        state.lastSynced = new Date().toISOString();
+        state.syncStatus = 'connected';
+        state.deviceCount = newDeviceCount;
+
+        saveData();
+        saveSyncSettings();
+
+        // Start real-time listener
+        startRealtimeSync();
+
+        render();
+        showToast('Connected! Synced ' + state.contacts.length + ' contacts, ' + state.tasks.length + ' tasks');
+
+      } catch (err) {
+        console.error('Join sync error:', err);
+        state.syncStatus = 'error';
+        render();
+        showToast('Failed to connect: ' + err.message);
+      }
+    }
+
+    // Start real-time listener
+    function startRealtimeSync() {
+      if (!firebaseDb || !state.syncId) return;
+
+      // Remove existing listener
+      stopRealtimeSync();
+
+      const ref = firebaseDb.ref('planners/' + state.syncId);
+
+      firebaseListener = ref.on('value', (snapshot) => {
+        if (!snapshot.exists()) return;
+
+        const data = snapshot.val();
+
+        // Skip if this is our own update
+        if (isReceivingUpdate) return;
+
+        // Check if remote data is newer
+        const remoteModified = data.lastModified || 0;
+        const localModified = state.lastSynced ? new Date(state.lastSynced).getTime() : 0;
+
+        // Only apply if remote is newer (with 500ms buffer to avoid race conditions)
+        if (remoteModified > localModified + 500) {
+          isReceivingUpdate = true;
+
+          // Apply remote data
+          if (Array.isArray(data.contacts)) state.contacts = data.contacts;
+          if (Array.isArray(data.tasks)) state.tasks = data.tasks;
+          if (Array.isArray(data.buckets) && data.buckets.length > 0) state.buckets = data.buckets;
+          state.deviceCount = data.deviceCount || 1;
+          state.lastSynced = new Date().toISOString();
+          state.syncStatus = 'connected';
+
+          // Save to localStorage (without triggering push)
+          try {
+            localStorage.setItem('admin_planner_data_v4', JSON.stringify({
+              contacts: state.contacts,
+              tasks: state.tasks,
+              buckets: state.buckets,
+              apiKey: state.apiKey,
+              braveApiKey: state.braveApiKey
+            }));
+          } catch (e) {
+            console.error('Failed to save synced data:', e);
+          }
+
+          render();
+
+          setTimeout(() => { isReceivingUpdate = false; }, 100);
+        }
+      }, (err) => {
+        console.error('Realtime sync error:', err);
+        state.syncStatus = 'error';
+        render();
+      });
+
+      // Monitor connection state
+      const connectedRef = firebaseDb.ref('.info/connected');
+      connectedRef.on('value', (snap) => {
+        if (snap.val() === true) {
+          state.syncStatus = 'connected';
+        } else {
+          state.syncStatus = 'disconnected';
+        }
+        render();
+      });
+    }
+
+    // Stop real-time listener
+    function stopRealtimeSync() {
+      if (firebaseListener && firebaseDb && state.syncId) {
+        firebaseDb.ref('planners/' + state.syncId).off('value', firebaseListener);
+        firebaseListener = null;
+      }
+    }
+
+    // Push local changes to Firebase (debounced)
+    function pushToFirebase() {
+      if (!firebaseDb || !state.syncId || !state.syncEnabled) return;
+      if (isReceivingUpdate) return; // Don't push while receiving
+
+      clearTimeout(syncDebounceTimer);
+      syncDebounceTimer = setTimeout(async () => {
+        try {
+          state.syncStatus = 'syncing';
+          render();
+
+          const ref = firebaseDb.ref('planners/' + state.syncId);
+          await ref.update(getSyncData());
+
+          state.lastSynced = new Date().toISOString();
+          state.syncStatus = 'connected';
+          saveSyncSettings();
+          render();
+        } catch (err) {
+          console.error('Push to Firebase error:', err);
+          state.syncStatus = 'error';
+          render();
+        }
+      }, 300); // 300ms debounce
+    }
+
+    // Disconnect from sync
+    function disconnectSync() {
+      if (!confirm('Disconnect from cloud sync? Your local data will be kept.')) return;
+
+      // Decrement device count
+      if (firebaseDb && state.syncId) {
+        const ref = firebaseDb.ref('planners/' + state.syncId + '/deviceCount');
+        ref.transaction((count) => Math.max(0, (count || 1) - 1));
+      }
+
+      stopRealtimeSync();
+
+      state.syncId = '';
+      state.syncEnabled = false;
+      state.syncStatus = null;
+      state.deviceCount = 0;
+      state.lastSynced = null;
+
+      saveSyncSettings();
+      render();
+      showToast('Disconnected from sync');
+    }
+
+    // Save Firebase config to localStorage
+    function saveFirebaseConfig() {
+      try {
+        if (state.firebaseConfig) {
+          localStorage.setItem('admin_planner_firebase_config', JSON.stringify(state.firebaseConfig));
+        }
+      } catch (e) {
+        console.error('Failed to save Firebase config:', e);
+      }
+    }
+
+    // Load Firebase config from localStorage
+    function loadFirebaseConfig() {
+      try {
+        const saved = localStorage.getItem('admin_planner_firebase_config');
+        if (saved) {
+          const config = JSON.parse(saved);
+          if (config && config.apiKey && config.databaseURL) {
+            state.firebaseConfig = config;
+            initializeFirebase(config);
+            return true;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load Firebase config:', e);
+      }
+      return false;
+    }
+
+    // Save sync settings to localStorage
+    function saveSyncSettings() {
+      try {
+        localStorage.setItem('admin_planner_sync_v5', JSON.stringify({
+          syncId: state.syncId,
+          syncEnabled: state.syncEnabled,
+          lastSynced: state.lastSynced,
+          deviceCount: state.deviceCount
+        }));
+      } catch (e) {
+        console.error('Failed to save sync settings:', e);
+      }
+    }
+
+    // Load sync settings from localStorage
+    function loadSyncSettings() {
+      try {
+        const saved = localStorage.getItem('admin_planner_sync_v5');
+        if (saved) {
+          const data = JSON.parse(saved);
+          state.syncId = data.syncId || '';
+          state.syncEnabled = data.syncEnabled || false;
+          state.lastSynced = data.lastSynced || null;
+          state.deviceCount = data.deviceCount || 0;
+
+          // If we have a sync ID and Firebase is configured, reconnect
+          if (state.syncId && state.firebaseConfig && firebaseDb) {
+            startRealtimeSync();
+            state.syncStatus = 'connecting';
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load sync settings:', e);
+      }
+    }
+
+    // Helper to copy Sync ID to clipboard
+    function copySyncId() {
+      if (state.syncId) {
+        navigator.clipboard.writeText(state.syncId).then(() => {
+          showToast('Sync ID copied!');
+        }).catch(() => {
+          prompt('Copy this Sync ID:', state.syncId);
+        });
+      }
+    }
+
+    // Setup Firebase from settings modal
+    function setupFirebase() {
+      const input = document.getElementById('firebaseConfigInput');
+      if (!input || !input.value.trim()) {
+        showToast('Please paste your Firebase config');
+        return;
+      }
+
+      try {
+        // Handle both JSON and JavaScript object formats
+        let configStr = input.value.trim();
+        // Convert JS object format to valid JSON:
+        // 1. Add quotes around unquoted keys (but not already quoted ones)
+        configStr = configStr.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3');
+        const config = JSON.parse(configStr);
+
+        // Validate required fields
+        if (!config.apiKey || !config.databaseURL) {
+          throw new Error('Config must include apiKey and databaseURL');
+        }
+
+        // Initialize Firebase
+        if (initializeFirebase(config)) {
+          showToast('Firebase configured successfully!');
+          render();
+        }
+      } catch (err) {
+        console.error('Firebase config error:', err);
+        showToast('Invalid config: ' + err.message);
+      }
+    }
+
+    // Auto-sync on data change (if enabled)
+    const originalSaveData = saveData;
+    saveData = function() {
+      originalSaveData();
+      if (state.syncEnabled && state.syncId && firebaseDb) {
+        pushToFirebase();
+      }
+    };
+
+    // ========== WEB SEARCH (Brave API) ==========
+    async function searchBrave(query) {
+      if (!state.braveApiKey) return null;
+
+      try {
+        const response = await fetch('https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=5', {
+          headers: {
+            'Accept': 'application/json',
+            'X-Subscription-Token': state.braveApiKey
+          }
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        return data.web?.results || [];
+      } catch (err) {
+        console.error('Brave search error:', err);
+        return null;
+      }
+    }
+
+    async function searchForPerson(name, company) {
+      const query = company ? `${name} ${company} LinkedIn` : `${name} professional`;
+      const results = await searchBrave(query);
+
+      if (!results || results.length === 0) return null;
+
+      // Return search snippets for Claude to analyze
+      return results.slice(0, 3).map(r => ({
+        title: r.title,
+        description: r.description,
+        url: r.url
+      }));
+    }
+
+    // Brain Dump Processing
+    async function processBrainDump() {
+      const input = document.getElementById('braindumpInput');
+      const text = input ? input.value.trim() : '';
+
+      if (!text) {
+        showToast('Enter some text first');
+        return;
+      }
+
+      if (!state.apiKey) {
+        showToast('Set your API key in Settings first');
+        return;
+      }
+
+      state.processing = { status: 'processing', message: 'Analyzing your input...' };
+      render();
+
+      try {
+        // Get current date info for accurate date parsing
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
+        const monthName = now.toLocaleString('en-US', { month: 'long' });
+
+        // Get existing tags for context
+        const existingGeoTags = [...new Set(state.contacts.flatMap(c => c.geoTags || []))];
+        const existingSecTags = [...new Set(state.contacts.flatMap(c => c.secTags || []))];
+
+        const systemPrompt = `You are an intelligent task and contact parser. Today is ${dayOfWeek}, ${monthName} ${now.getDate()}, ${now.getFullYear()} (${todayStr}).
+
+IMPORTANT DATE RULES:
+- When user says "today", use ${todayStr}
+- When user says "tomorrow", calculate the next day from ${todayStr}
+- When user says "Friday" or any weekday, find the NEXT occurrence of that day from today (${dayOfWeek})
+- When user says "next week", add 7 days to today
+- When user says "end of week", use the coming Friday
+- Always return dates in YYYY-MM-DD format
+
+SMART INFERENCE RULES FOR CONTACTS:
+- Infer geoTags (locations/regions) from context:
+  * Ethiopian names, Addis Ababa, Ethiopian companies → "Ethiopia"
+  * Kenyan references → "Kenya"
+  * East African context → "East Africa"
+  * US-based organizations like DFC, USAID → "USA"
+  * Existing geo tags in system: ${existingGeoTags.join(', ') || 'none yet'}
+
+- Infer secTags (sectors) from company/role context:
+  * DFC, IFC, World Bank → "Development Finance"
+  * Hospitals, clinics, medical → "Healthcare"
+  * Banks, fintech, investment → "Finance"
+  * NGOs, foundations → "Development"
+  * Tech companies, software → "Technology"
+  * Existing sector tags in system: ${existingSecTags.join(', ') || 'none yet'}
+
+- Infer strength based on context:
+  * "met with", "had coffee", "long call" → "Medium" or "Strong"
+  * "was introduced to", "heard about" → "New"
+  * "old friend", "known for years" → "Strong"
+
+Available task buckets: ${state.buckets.join(', ')}
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{
+  "tasks": [{"title": "...", "checklist": ["item1"], "bucket": "...", "dueDate": "YYYY-MM-DD", "status": "todo/urgent/priority"}],
+  "contacts": [{"name": "Full Name", "company": "...", "role": "Job Title", "geoTags": ["Ethiopia"], "secTags": ["Healthcare"], "strength": "New/Medium/Strong", "nextStep": "...", "nextStepDate": "YYYY-MM-DD"}],
+  "peopleToSearch": ["Name1", "Name2"],
+  "summary": "Brief summary"
+}
+
+The "peopleToSearch" array should include names of people mentioned where you're unsure about their details and web search would help.`;
+
+        const response = await fetch(ANTHROPIC_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': state.apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2048,
+            messages: [{ role: 'user', content: text }],
+            system: systemPrompt
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('API error: ' + response.status);
+        }
+
+        const data = await response.json();
+
+        if (!data || !data.content || !data.content[0] || !data.content[0].text) {
+          throw new Error('Invalid API response format');
+        }
+        const content = data.content[0].text;
+
+        // Parse JSON from response
+        let parsed;
+        try {
+          // Try to find JSON in the response
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) throw new Error('No JSON found');
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (parseErr) {
+          console.error('Parse error:', parseErr, 'Content:', content);
+          throw new Error('Could not parse AI response');
+        }
+
+        // Validate structure
+        if (typeof parsed !== 'object' || parsed === null) {
+          throw new Error('Invalid response structure');
+        }
+        parsed.tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+        parsed.contacts = Array.isArray(parsed.contacts) ? parsed.contacts : [];
+        parsed.peopleToSearch = Array.isArray(parsed.peopleToSearch) ? parsed.peopleToSearch : [];
+
+        // Web search for unknown people (if Brave API key is set)
+        if (state.braveApiKey && parsed.peopleToSearch.length > 0) {
+          state.processing = { status: 'processing', message: 'Searching for contact info...' };
+          render();
+
+          for (const personName of parsed.peopleToSearch.slice(0, 3)) { // Limit to 3 searches
+            const contactData = parsed.contacts.find(c => c.name.toLowerCase().includes(personName.toLowerCase()));
+            const searchResults = await searchForPerson(personName, contactData?.company);
+
+            if (searchResults && searchResults.length > 0) {
+              // Send search results to Claude for enrichment
+              const enrichPrompt = `Based on these search results about "${personName}", extract professional info.
+
+Search results:
+${searchResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}
+
+Current info we have: ${JSON.stringify(contactData || {})}
+
+Return ONLY JSON with any additional info you can confirm:
+{"company": "...", "role": "...", "geoTags": [], "secTags": []}
+Only include fields you're confident about from the search results.`;
+
+              try {
+                const enrichResponse = await fetch(ANTHROPIC_API_URL, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': state.apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true'
+                  },
+                  body: JSON.stringify({
+                    model: 'claude-sonnet-4-20250514',
+                    max_tokens: 500,
+                    messages: [{ role: 'user', content: enrichPrompt }]
+                  })
+                });
+
+                if (enrichResponse.ok) {
+                  const enrichData = await enrichResponse.json();
+                  const enrichContent = enrichData.content?.[0]?.text;
+                  if (enrichContent) {
+                    const enrichMatch = enrichContent.match(/\{[\s\S]*\}/);
+                    if (enrichMatch) {
+                      const enriched = JSON.parse(enrichMatch[0]);
+                      // Merge enriched data with contact
+                      if (contactData) {
+                        if (enriched.company && !contactData.company) contactData.company = enriched.company;
+                        if (enriched.role && !contactData.role) contactData.role = enriched.role;
+                        if (enriched.geoTags?.length) contactData.geoTags = [...new Set([...(contactData.geoTags || []), ...enriched.geoTags])];
+                        if (enriched.secTags?.length) contactData.secTags = [...new Set([...(contactData.secTags || []), ...enriched.secTags])];
+                      }
+                    }
+                  }
+                }
+              } catch (enrichErr) {
+                console.error('Enrichment error:', enrichErr);
+              }
+            }
+          }
+        }
+
+        // Add tasks
+        if (parsed.tasks.length > 0) {
+          parsed.tasks.forEach(t => {
+            state.tasks.push({
+              id: getNextId(state.tasks),
+              title: t.title || 'Untitled Task',
+              bucket: state.buckets.includes(t.bucket) ? t.bucket : 'Work Admin',
+              checklist: Array.isArray(t.checklist) ? t.checklist : [],
+              dueDate: t.dueDate || '',
+              status: t.status || 'todo',
+              notes: ''
+            });
+          });
+        }
+
+        // Add/update contacts
+        if (parsed.contacts.length > 0) {
+          parsed.contacts.forEach(c => {
+            if (!c.name) return;
+
+            const existing = state.contacts.find(x => x.name.toLowerCase() === c.name.toLowerCase());
+            if (existing) {
+              // Update existing contact
+              if (c.nextStep) existing.nextStep = c.nextStep;
+              if (c.nextStepDate) existing.nextStepDate = c.nextStepDate;
+              if (c.company) existing.company = c.company;
+              if (c.role) existing.role = c.role;
+              if (c.geoTags?.length) existing.geoTags = [...new Set([...(existing.geoTags || []), ...c.geoTags])];
+              if (c.secTags?.length) existing.secTags = [...new Set([...(existing.secTags || []), ...c.secTags])];
+              if (c.strength && c.strength !== 'New') existing.strength = c.strength;
+            } else {
+              // Add new contact
+              state.contacts.push({
+                id: getNextId(state.contacts),
+                name: c.name,
+                company: c.company || '',
+                role: c.role || '',
+                geoTags: Array.isArray(c.geoTags) ? c.geoTags : [],
+                secTags: Array.isArray(c.secTags) ? c.secTags : [],
+                nextStep: c.nextStep || '',
+                nextStepDate: c.nextStepDate || '',
+                strength: c.strength || 'New',
+                lastContactedDate: ''
+              });
+            }
+          });
+        }
+
+        saveData();
+        const summary = parsed.summary || `Added ${parsed.tasks.length} task(s) and ${parsed.contacts.length} contact(s)`;
+        state.processing = { status: 'done', message: summary };
+        input.value = '';
+        render();
+
+        setTimeout(() => {
+          state.processing = null;
+          render();
+        }, 5000);
+
+      } catch (err) {
+        console.error(err);
+        state.processing = { status: 'error', message: 'Error: ' + err.message };
+        render();
+      }
+    }
+
+    // ========== IMAGE-BASED CONTACT SCANNING ==========
+
+    function handleImageDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const dropZone = e.currentTarget;
+      dropZone.classList.remove('drag-over');
+
+      const files = Array.from(e.dataTransfer.files).filter(f =>
+        f.type.startsWith('image/')
+      );
+
+      files.forEach(addImage);
+    }
+
+    function handleImageSelect(e) {
+      const files = Array.from(e.target.files).filter(f =>
+        f.type.startsWith('image/')
+      );
+      files.forEach(addImage);
+      e.target.value = ''; // Reset input
+    }
+
+    function addImage(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state.uploadedImages.push({
+          dataUrl: e.target.result,
+          name: file.name
+        });
+        render();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeImage(index) {
+      state.uploadedImages.splice(index, 1);
+      render();
+    }
+
+    function clearImages() {
+      state.uploadedImages = [];
+      render();
+    }
+
+    async function processImagesForContacts() {
+      if (state.uploadedImages.length === 0) {
+        showToast('Upload some images first');
+        return;
+      }
+
+      if (!state.apiKey) {
+        showToast('Set your Anthropic API key in Settings first');
+        return;
+      }
+
+      if (!state.braveApiKey) {
+        showToast('Set your Brave Search API key in Settings first');
+        return;
+      }
+
+      state.processing = { status: 'processing', message: 'Analyzing images for contacts...' };
+      render();
+
+      try {
+        // Prepare image content for Vision API
+        const imageContent = state.uploadedImages.map(img => ({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: img.dataUrl.split(';')[0].split(':')[1],
+            data: img.dataUrl.split(',')[1]
+          }
+        }));
+
+        const systemPrompt = `You are an expert at extracting contact information from images.
+Analyze the provided images and extract any people/contacts you can identify.
+
+Look for:
+- Names on LinkedIn profiles, business cards, email signatures
+- Meeting attendee lists, org charts, team photos with names
+- Any visible professional information
+
+For each person found, extract:
+- name (required)
+- company (if visible)
+- role/title (if visible)
+- Any location hints for geoTags
+- Any industry/sector hints for secTags
+
+Respond ONLY with valid JSON (no markdown):
+{
+  "contacts": [
+    {"name": "Full Name", "company": "Company", "role": "Title", "geoTags": ["Ethiopia"], "secTags": ["Finance"]},
+  ],
+  "summary": "Found X contacts from the images"
+}
+
+If no contacts are found, return {"contacts": [], "summary": "No contacts found"}`;
+
+        const response = await fetch(ANTHROPIC_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': state.apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2048,
+            messages: [{
+              role: 'user',
+              content: [
+                ...imageContent,
+                { type: 'text', text: 'Extract all contacts/people visible in these images.' }
+              ]
+            }],
+            system: systemPrompt
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('API error: ' + response.status);
+        }
+
+        const data = await response.json();
+        const content = data.content?.[0]?.text;
+
+        if (!content) throw new Error('No response from API');
+
+        // Parse JSON
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse response');
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        const extractedContacts = parsed.contacts || [];
+
+        if (extractedContacts.length === 0) {
+          state.processing = { status: 'done', message: 'No contacts found in images' };
+          render();
+          setTimeout(() => { state.processing = null; render(); }, 3000);
+          return;
+        }
+
+        // Enrich contacts with web search
+        state.processing = { status: 'processing', message: 'Enriching ' + extractedContacts.length + ' contacts with web search...' };
+        render();
+
+        for (let i = 0; i < extractedContacts.length; i++) {
+          const contact = extractedContacts[i];
+          state.processing = { status: 'processing', message: 'Searching for ' + contact.name + '... (' + (i+1) + '/' + extractedContacts.length + ')' };
+          render();
+
+          const searchResults = await searchForPerson(contact.name, contact.company);
+
+          if (searchResults && searchResults.length > 0) {
+            // Send to Claude for enrichment
+            const enrichPrompt = `Based on these search results about "${contact.name}", extract professional info.
+
+Search results:
+${searchResults.map(r => '- ' + r.title + ': ' + r.description).join('\n')}
+
+Current info: ${JSON.stringify(contact)}
+
+Return ONLY JSON with any additional info:
+{"company": "...", "role": "...", "geoTags": [], "secTags": []}
+Only include fields you're confident about.`;
+
+            try {
+              const enrichResponse = await fetch(ANTHROPIC_API_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-api-key': state.apiKey,
+                  'anthropic-version': '2023-06-01',
+                  'anthropic-dangerous-direct-browser-access': 'true'
+                },
+                body: JSON.stringify({
+                  model: 'claude-sonnet-4-20250514',
+                  max_tokens: 500,
+                  messages: [{ role: 'user', content: enrichPrompt }]
+                })
+              });
+
+              if (enrichResponse.ok) {
+                const enrichData = await enrichResponse.json();
+                const enrichContent = enrichData.content?.[0]?.text;
+                if (enrichContent) {
+                  const enrichMatch = enrichContent.match(/\{[\s\S]*\}/);
+                  if (enrichMatch) {
+                    const enriched = JSON.parse(enrichMatch[0]);
+                    if (enriched.company && !contact.company) contact.company = enriched.company;
+                    if (enriched.role && !contact.role) contact.role = enriched.role;
+                    if (enriched.geoTags?.length) contact.geoTags = [...new Set([...(contact.geoTags || []), ...enriched.geoTags])];
+                    if (enriched.secTags?.length) contact.secTags = [...new Set([...(contact.secTags || []), ...enriched.secTags])];
+                  }
+                }
+              }
+            } catch (enrichErr) {
+              console.error('Enrichment error for ' + contact.name + ':', enrichErr);
+            }
+          }
+
+          // Check if contact already exists
+          const existing = state.contacts.find(c => c.name.toLowerCase() === contact.name.toLowerCase());
+          contact._isUpdate = !!existing;
+          contact._existingId = existing?.id;
+          contact._tempId = 'pending_' + i;
+        }
+
+        // Store pending contacts and open confirmation modal
+        state.pendingContacts = extractedContacts;
+        state.selectedPendingContacts = new Set(extractedContacts.map(c => c._tempId));
+        state.processing = null;
+        state.modal = { type: 'confirmContacts' };
+        clearImages();
+        render();
+
+      } catch (err) {
+        console.error('Image processing error:', err);
+        state.processing = { status: 'error', message: 'Error: ' + err.message };
+        render();
+      }
+    }
+
+    function togglePendingContact(tempId) {
+      if (state.selectedPendingContacts.has(tempId)) {
+        state.selectedPendingContacts.delete(tempId);
+      } else {
+        state.selectedPendingContacts.add(tempId);
+      }
+      render();
+    }
+
+    function updatePendingContactField(tempId, field, value) {
+      const contact = state.pendingContacts.find(c => c._tempId === tempId);
+      if (contact) {
+        contact[field] = value;
+      }
+    }
+
+    function confirmAddContacts() {
+      const selectedContacts = state.pendingContacts.filter(c =>
+        state.selectedPendingContacts.has(c._tempId)
+      );
+
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      selectedContacts.forEach(c => {
+        if (c._isUpdate && c._existingId) {
+          // Update existing contact
+          const existing = state.contacts.find(x => x.id === c._existingId);
+          if (existing) {
+            if (c.company) existing.company = c.company;
+            if (c.role) existing.role = c.role;
+            if (c.geoTags?.length) existing.geoTags = [...new Set([...(existing.geoTags || []), ...c.geoTags])];
+            if (c.secTags?.length) existing.secTags = [...new Set([...(existing.secTags || []), ...c.secTags])];
+            updatedCount++;
+          }
+        } else {
+          // Add new contact
+          state.contacts.push({
+            id: getNextId(state.contacts),
+            name: c.name,
+            company: c.company || '',
+            role: c.role || '',
+            geoTags: Array.isArray(c.geoTags) ? c.geoTags : [],
+            secTags: Array.isArray(c.secTags) ? c.secTags : [],
+            nextStep: '',
+            nextStepDate: '',
+            strength: 'New',
+            lastContactedDate: ''
+          });
+          addedCount++;
+        }
+      });
+
+      saveData();
+      state.pendingContacts = [];
+      state.selectedPendingContacts = new Set();
+      closeModal();
+
+      const msg = [];
+      if (addedCount > 0) msg.push('Added ' + addedCount + ' new');
+      if (updatedCount > 0) msg.push('updated ' + updatedCount + ' existing');
+      showToast(msg.join(', ') + ' contact(s)!');
+    }
+
+    function cancelPendingContacts() {
+      state.pendingContacts = [];
+      state.selectedPendingContacts = new Set();
+      closeModal();
+    }
+
+    function renderTaskCard(t, showDoneBtn = true) {
+      const exp = state.expandedTasks.has(t.id);
+      const checklist = t.checklist || [];
+      const checklistDone = checklist.filter(i => i.startsWith('[x] ')).length;
+      const escapedBucket = escapeAttr(t.bucket).replace(/'/g, "\\'");
+      const isDone = t.status === 'done';
+
+      return '<div class="task-card ' + escapeAttr(t.status) + '" draggable="true" ondragstart="handleDragStart(event,' + t.id + ')" ondragend="handleDragEnd(event)" ondragover="handleTaskDragOver(event,' + t.id + ')" ondrop="handleTaskDrop(event,' + t.id + ',\'' + escapedBucket + '\')" ondblclick="openEditTaskModal(' + t.id + ')">' +
+        '<div class="task-header">' +
+        (showDoneBtn ? '<button class="task-done-btn" onclick="markTaskDone(' + t.id + ',event)" title="' + (isDone ? 'Mark as not done' : 'Mark as done') + '"></button>' : '') +
+        '<div class="task-title-row">' +
+        (checklist.length ? '<button class="expand-btn" onclick="event.stopPropagation();toggleTaskExpand(' + t.id + ')">' + (exp ? '▼' : '▶') + '</button>' : '') +
+        '<span class="task-title">' + escapeHtml(t.title) + '</span></div>' +
+        '<button class="task-menu" onclick="event.stopPropagation();openEditTaskModal(' + t.id + ')">⋯</button></div>' +
+        (exp && checklist.length ? '<div class="checklist">' + checklist.map((item, idx) => {
+          const d = item.startsWith('[x] ');
+          const text = d ? item.replace('[x] ', '') : item;
+          return '<div class="checklist-item ' + (d ? 'completed' : '') + '" onclick="toggleChecklistItem(' + t.id + ',' + idx + ',event)"><input type="checkbox" ' + (d ? 'checked' : '') + '><span class="' + (d ? 'done' : '') + '">' + escapeHtml(text) + '</span></div>';
+        }).join('') + '</div>' : '') +
+        '<div class="task-footer">' +
+        (checklist.length ? '<span class="task-meta">✓ ' + checklistDone + '/' + checklist.length + '</span>' : '') +
+        (t.dueDate ? '<span class="due-date ' + (isOverdue(t.dueDate) ? 'overdue' : '') + '">📅 ' + formatDate(t.dueDate) + '</span>' : '') +
+        '<span class="status-badge ' + escapeAttr(t.status) + '">' + escapeHtml(t.status.replace('-', ' ')) + '</span></div></div>';
+    }
+    
+    function renderContactCard(c) {
+      return '<div class="contact-card" onclick="openEditContactModal(' + c.id + ')">' +
+        '<div class="contact-avatar">' + escapeHtml(getInitials(c.name)) + '</div>' +
+        '<div class="contact-info"><div class="contact-name">' + escapeHtml(c.name) + '</div>' +
+        '<div class="contact-detail">' + escapeHtml(c.company) + (c.role ? ' • ' + escapeHtml(c.role) : '') + '</div>' +
+        '<div class="contact-tags">' +
+        (c.geoTags || []).slice(0,2).map(t => '<span class="contact-tag geo">' + escapeHtml(t) + '</span>').join('') +
+        (c.secTags || []).slice(0,2).map(t => '<span class="contact-tag sec">' + escapeHtml(t) + '</span>').join('') +
+        (c.lastContactedDate ? '<span class="contact-tag" style="background:rgba(74,222,128,0.15);color:var(--accent)">Last: ' + formatDate(c.lastContactedDate) + '</span>' : '') +
+        '</div></div>' +
+        '<div class="contact-actions">' +
+        (c.nextStep ? '<span class="next-step-badge ' + (isOverdue(c.nextStepDate) ? 'overdue' : '') + '">' + escapeHtml(c.nextStep) + '</span>' : '') +
+        (c.nextStepDate ? '<span class="contact-date">' + formatDate(c.nextStepDate) + '</span>' : '') +
+        '</div></div>';
+    }
+
+    function renderModal() { 
+      if (!state.modal) return ''; 
+      
+      if (state.modal.type === 'settings') {
+        const syncConnected = !!state.syncId && state.syncEnabled;
+        const firebaseConfigured = !!state.firebaseConfig;
+        const syncStatusIcon = state.syncStatus === 'syncing' || state.syncStatus === 'connecting' ? '⏳' :
+                              (state.syncStatus === 'connected' ? '✅' :
+                              (state.syncStatus === 'error' ? '❌' :
+                              (state.syncStatus === 'disconnected' ? '⚡' : '')));
+        const lastSyncedText = state.lastSynced ? 'Last synced: ' + new Date(state.lastSynced).toLocaleString() : '';
+
+        return '<div class="modal-overlay" onclick="closeModal()"><div class="modal" onclick="event.stopPropagation()">' +
+          '<h3>⚙️ Settings</h3>' +
+
+          // Manual Sync Section (Works everywhere)
+          '<div style="background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);border-radius:8px;padding:12px;margin-bottom:16px">' +
+          '<label style="color:var(--accent-secondary)">📱 Manual Sync (Works Everywhere)</label>' +
+          '<p style="font-size:11px;color:var(--text-muted);margin:4px 0 8px">Copy code on one device, paste on another to sync</p>' +
+          '<div style="display:flex;gap:8px;margin:8px 0">' +
+          '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--accent-secondary)" onclick="copyDataToClipboard()">📋 Copy All Data</button>' +
+          '<button class="btn btn-secondary btn-sm" style="flex:1" onclick="pasteDataFromClipboard()">📥 Paste Data</button>' +
+          '</div></div>' +
+
+          // Firebase Cloud Sync Section
+          '<div style="background:rgba(74,222,128,0.05);border:1px solid rgba(74,222,128,0.2);border-radius:8px;padding:12px;margin-bottom:16px">' +
+          '<label style="color:var(--accent)">☁️ Real-time Cloud Sync ' + syncStatusIcon + '</label>' +
+
+          (syncConnected ?
+            // Connected state - show sync ID and status
+            '<div style="margin:12px 0">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+            '<span style="font-size:11px;color:var(--text-muted)">Sync ID:</span>' +
+            '<span class="sync-id-display" onclick="copySyncId()" style="cursor:pointer" title="Click to copy">' + escapeHtml(state.syncId) + '</span>' +
+            '<button class="btn btn-sm" style="padding:4px 8px;font-size:10px" onclick="copySyncId()">📋</button>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:12px;font-size:11px;color:var(--text-secondary)">' +
+            '<span>' + escapeHtml(lastSyncedText) + '</span>' +
+            (state.deviceCount > 0 ? '<span class="device-count"><span class="device-dot"></span> ' + state.deviceCount + ' device(s)</span>' : '') +
+            '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;margin-top:12px">' +
+            '<button class="btn btn-sm" style="flex:1;background:rgba(220,38,38,0.1);color:#FCA5A5" onclick="disconnectSync()">Disconnect</button>' +
+            '</div>'
+            :
+            // Not connected state
+            (firebaseConfigured ?
+              // Firebase configured but not syncing
+              '<p style="font-size:11px;color:var(--text-muted);margin:4px 0 12px">Firebase connected! Create or join a sync.</p>' +
+              '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+              '<button class="btn btn-primary btn-sm" onclick="createNewSync()" style="flex:1">🆕 Create New Sync</button>' +
+              '</div>' +
+              '<div style="display:flex;gap:8px">' +
+              '<input type="text" id="syncIdInput" placeholder="Enter 8-char Sync ID..." style="flex:1;font-size:12px;padding:8px;text-transform:uppercase;letter-spacing:1px" maxlength="8">' +
+              '<button class="btn btn-secondary btn-sm" onclick="joinSyncId(document.getElementById(\'syncIdInput\').value)">Join</button>' +
+              '</div>'
+              :
+              // Firebase not configured - show setup
+              '<p style="font-size:11px;color:var(--text-muted);margin:4px 0 8px">Real-time sync across all your devices using Firebase</p>' +
+              '<details style="margin:8px 0">' +
+              '<summary style="cursor:pointer;font-size:11px;color:var(--accent);margin-bottom:8px">🔧 Configure Firebase (one-time setup)</summary>' +
+              '<div style="margin-top:8px">' +
+              '<p style="font-size:10px;color:var(--text-muted);margin-bottom:8px">1. Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">Firebase Console</a><br>2. Create a project (free tier)<br>3. Add a Web App<br>4. Enable Realtime Database (test mode)<br>5. Paste your config below:</p>' +
+              '<textarea id="firebaseConfigInput" rows="6" placeholder=\'{"apiKey":"...","authDomain":"...","databaseURL":"https://YOUR-PROJECT.firebaseio.com","projectId":"..."}\' style="font-size:11px;font-family:monospace"></textarea>' +
+              '<button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%" onclick="setupFirebase()">Save Firebase Config</button>' +
+              '</div>' +
+              '</details>'
+            )
+          ) +
+          '</div>' +
+
+          // API Keys Section
+          '<label>Anthropic API Key</label>' +
+          '<input type="password" id="apiKeyInput" value="' + escapeAttr(state.apiKey) + '" placeholder="sk-ant-...">' +
+          '<p style="font-size:10px;color:var(--text-muted);margin-bottom:12px">For Brain Dump AI processing</p>' +
+
+          '<label>Brave Search API Key <span style="font-size:9px;color:var(--text-muted)">(optional)</span></label>' +
+          '<input type="password" id="braveApiKeyInput" value="' + escapeAttr(state.braveApiKey) + '" placeholder="BSA...">' +
+          '<p style="font-size:10px;color:var(--text-muted);margin-bottom:16px">For web search enrichment. <a href="https://brave.com/search/api/" target="_blank" style="color:var(--accent)">Get free key (2000/mo)</a></p>' +
+
+          '<div class="modal-actions">' +
+          '<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="saveApiKey()">Save</button>' +
+          '</div></div></div>';
+      }
+      
+      if (state.modal.type === 'addTask' || state.modal.type === 'editTask') {
+        const t = state.modal.task || {};
+        const isEdit = state.modal.type === 'editTask';
+
+        const checklistHtml = state.modalChecklist.map((item, idx) => {
+          const isDone = item.startsWith('[x] ');
+          const text = isDone ? item.replace('[x] ', '') : item;
+          return '<div class="checklist-edit-item">' +
+            '<input type="checkbox" ' + (isDone ? 'checked' : '') + ' onchange="toggleModalChecklistItem(' + idx + ')">' +
+            '<span class="' + (isDone ? 'done' : '') + '">' + escapeHtml(text) + '</span>' +
+            '<button onclick="removeChecklistItem(' + idx + ')">×</button>' +
+            '</div>';
+        }).join('');
+
+        return '<div class="modal-overlay" onclick="closeModal()"><div class="modal" onclick="event.stopPropagation()">' +
+          '<h3>' + (isEdit ? 'Edit' : 'Add') + ' Task</h3>' +
+          '<label>Title</label>' +
+          '<input type="text" id="taskTitle" value="' + escapeAttr(t.title || '') + '" placeholder="Task title">' +
+          (isEdit ? '<label>Bucket</label><select id="taskBucket">' + state.buckets.map(b => '<option value="' + escapeAttr(b) + '"' + (t.bucket === b ? ' selected' : '') + '>' + escapeHtml(b) + '</option>').join('') + '</select>' : '') +
+          '<label>Due Date</label>' +
+          '<input type="date" id="taskDueDate" value="' + escapeAttr(t.dueDate || '') + '">' +
+          '<label>Status</label>' +
+          '<select id="taskStatus">' +
+          '<option value="todo"' + ((t.status || 'todo') === 'todo' ? ' selected' : '') + '>To Do</option>' +
+          '<option value="in-progress"' + (t.status === 'in-progress' ? ' selected' : '') + '>In Progress</option>' +
+          '<option value="priority"' + (t.status === 'priority' ? ' selected' : '') + '>Priority</option>' +
+          '<option value="urgent"' + (t.status === 'urgent' ? ' selected' : '') + '>Urgent</option>' +
+          '<option value="done"' + (t.status === 'done' ? ' selected' : '') + '>Done</option>' +
+          '</select>' +
+          '<div class="checklist-editor">' +
+          '<div class="checklist-editor-title">Checklist Items</div>' +
+          checklistHtml +
+          '<div class="add-checklist-row">' +
+          '<input type="text" id="newChecklistInput" placeholder="Add item..." onkeypress="if(event.key===\'Enter\'){event.preventDefault();addChecklistItem();}">' +
+          '<button onclick="addChecklistItem()">Add</button>' +
+          '</div></div>' +
+          '<label>Notes</label>' +
+          '<textarea id="taskNotes" rows="2" placeholder="Optional notes...">' + escapeHtml(t.notes || '') + '</textarea>' +
+          '<div class="modal-actions">' +
+          (isEdit ? '<button class="btn btn-danger" onclick="deleteTask()">Delete</button>' : '') +
+          '<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="saveTask()">Save</button>' +
+          '</div></div></div>';
+      }
+      
+      if (state.modal.type === 'addContact' || state.modal.type === 'editContact') {
+        const c = state.modal.contact || {};
+        const isEdit = state.modal.type === 'editContact';
+
+        // Get unique geo and sector tags for dropdowns
+        const allGeoTags = [...new Set(state.contacts.flatMap(x => x.geoTags || []))].sort();
+        const allSecTags = [...new Set(state.contacts.flatMap(x => x.secTags || []))].sort();
+        const strengths = ['New', 'Weak', 'Medium', 'Strong'];
+
+        return '<div class="modal-overlay" onclick="closeModal()"><div class="modal" onclick="event.stopPropagation()">' +
+          '<h3>' + (isEdit ? 'Edit' : 'Add') + ' Contact</h3>' +
+          '<label>Name</label><input type="text" id="contactName" value="' + escapeAttr(c.name || '') + '" placeholder="Full name">' +
+          '<label>Company</label><input type="text" id="contactCompany" value="' + escapeAttr(c.company || '') + '" placeholder="Company">' +
+          '<label>Role</label><input type="text" id="contactRole" value="' + escapeAttr(c.role || '') + '" placeholder="Job title">' +
+          '<label>Relationship Strength</label>' +
+          '<select id="contactStrength">' +
+          strengths.map(s => '<option value="' + s + '"' + ((c.strength || 'New') === s ? ' selected' : '') + '>' + s + '</option>').join('') +
+          '</select>' +
+          '<label>Geo Tags (comma separated)</label>' +
+          '<input type="text" id="contactGeoTags" value="' + escapeAttr((c.geoTags || []).join(', ')) + '" placeholder="e.g., Ethiopia, Kenya">' +
+          (allGeoTags.length ? '<div style="font-size:10px;color:var(--text-muted);margin:-8px 0 12px">Existing: ' + allGeoTags.map(t => escapeHtml(t)).join(', ') + '</div>' : '') +
+          '<label>Sector Tags (comma separated)</label>' +
+          '<input type="text" id="contactSecTags" value="' + escapeAttr((c.secTags || []).join(', ')) + '" placeholder="e.g., Healthcare, Finance">' +
+          (allSecTags.length ? '<div style="font-size:10px;color:var(--text-muted);margin:-8px 0 12px">Existing: ' + allSecTags.map(t => escapeHtml(t)).join(', ') + '</div>' : '') +
+          '<label>Last Contacted Date</label><input type="date" id="contactLastContacted" value="' + escapeAttr(c.lastContactedDate || '') + '">' +
+          '<label>Next Step</label><input type="text" id="contactNextStep" value="' + escapeAttr(c.nextStep || '') + '" placeholder="e.g., Follow up call">' +
+          '<label>Next Step Date</label><input type="date" id="contactNextStepDate" value="' + escapeAttr(c.nextStepDate || '') + '">' +
+          '<div class="modal-actions">' +
+          (isEdit ? '<button class="btn btn-danger" onclick="deleteContact()">Delete</button>' : '') +
+          '<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="saveContact()">Save</button>' +
+          '</div></div></div>';
+      }
+
+      if (state.modal.type === 'confirmContacts') {
+        const selectedCount = state.selectedPendingContacts.size;
+        const newCount = state.pendingContacts.filter(c => !c._isUpdate && state.selectedPendingContacts.has(c._tempId)).length;
+        const updateCount = state.pendingContacts.filter(c => c._isUpdate && state.selectedPendingContacts.has(c._tempId)).length;
+
+        return '<div class="modal-overlay" onclick="cancelPendingContacts()"><div class="modal" style="max-width:550px" onclick="event.stopPropagation()">' +
+          '<h3>📋 Review Extracted Contacts</h3>' +
+          '<div class="confirm-summary">' +
+          'Found <strong>' + state.pendingContacts.length + '</strong> contacts. ' +
+          'Selected: <strong>' + selectedCount + '</strong> (' + newCount + ' new, ' + updateCount + ' updates)' +
+          '</div>' +
+          '<div class="confirm-contacts-list">' +
+          state.pendingContacts.map(c => {
+            const isSelected = state.selectedPendingContacts.has(c._tempId);
+            return '<div class="confirm-contact-item ' + (isSelected ? 'selected' : '') + '">' +
+              '<div class="confirm-contact-header">' +
+              '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' onchange="togglePendingContact(\'' + c._tempId + '\')">' +
+              '<span class="confirm-contact-name">' + escapeHtml(c.name) + '</span>' +
+              '<span class="confirm-contact-badge ' + (c._isUpdate ? 'update' : 'new') + '">' + (c._isUpdate ? 'UPDATE' : 'NEW') + '</span>' +
+              '</div>' +
+              '<div class="confirm-contact-fields">' +
+              '<div><label>Company</label><input type="text" value="' + escapeAttr(c.company || '') + '" onchange="updatePendingContactField(\'' + c._tempId + '\', \'company\', this.value)"></div>' +
+              '<div><label>Role</label><input type="text" value="' + escapeAttr(c.role || '') + '" onchange="updatePendingContactField(\'' + c._tempId + '\', \'role\', this.value)"></div>' +
+              '<div><label>Geo Tags</label><input type="text" value="' + escapeAttr((c.geoTags || []).join(', ')) + '" onchange="updatePendingContactField(\'' + c._tempId + '\', \'geoTags\', this.value.split(\',\').map(s=>s.trim()).filter(Boolean))"></div>' +
+              '<div><label>Sector Tags</label><input type="text" value="' + escapeAttr((c.secTags || []).join(', ')) + '" onchange="updatePendingContactField(\'' + c._tempId + '\', \'secTags\', this.value.split(\',\').map(s=>s.trim()).filter(Boolean))"></div>' +
+              '</div></div>';
+          }).join('') +
+          '</div>' +
+          '<div class="modal-actions">' +
+          '<button class="btn btn-secondary" onclick="cancelPendingContacts()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="confirmAddContacts()"' + (selectedCount === 0 ? ' disabled' : '') + '>Add ' + selectedCount + ' Contact(s)</button>' +
+          '</div></div></div>';
+      }
+
+      return '';
+    }
+
+    function render() {
+      const kanban = document.querySelector('.kanban-container');
+      const scrollPos = kanban ? kanban.scrollLeft : 0;
+
+      // Preserve search input focus and cursor position
+      const activeEl = document.activeElement;
+      const wasSearchFocused = activeEl && activeEl.matches('.search-bar input');
+      const searchCursorPos = wasSearchFocused ? activeEl.selectionStart : 0;
+      const searchCursorEnd = wasSearchFocused ? activeEl.selectionEnd : 0;
+
+      const app = document.getElementById('app');
+      const today = getTodayItems(); 
+      const filteredContacts = state.contacts.filter(c => { 
+        const s = state.filters.search.toLowerCase(); 
+        return !s || c.name.toLowerCase().includes(s) || c.company.toLowerCase().includes(s); 
+      });
+      
+      let processingHtml = '';
+      if (state.processing) {
+        const dotClass = state.processing.status === 'error' ? 'error' : (state.processing.status === 'done' ? 'done' : '');
+        processingHtml = '<div class="processing-status"><div class="status-header"><div class="status-dot ' + dotClass + '"></div><span class="status-text">' + escapeHtml(state.processing.message) + '</span></div></div>';
+      }
+      
+      app.innerHTML = 
+        '<header class="header">' +
+        '<div class="logo">ADMIN PLANNER</div>' +
+        '<nav class="nav-tabs">' +
+        '<button class="nav-tab ' + (state.view === 'braindump' ? 'active' : '') + '" onclick="setView(\'braindump\')">🧠 Dump</button>' +
+        '<button class="nav-tab ' + (state.view === 'today' ? 'active' : '') + '" onclick="setView(\'today\')">📅 Today</button>' +
+        '<button class="nav-tab ' + (state.view === 'kanban' ? 'active' : '') + '" onclick="setView(\'kanban\')">▦ Board</button>' +
+        '<button class="nav-tab ' + (state.view === 'crm' ? 'active' : '') + '" onclick="setView(\'crm\')">👥 CRM</button>' +
+        '</nav>' +
+        '<div class="header-actions">' +
+        (function() {
+          // Cloud sync status indicator
+          if (state.syncId && state.syncEnabled) {
+            let icon = '☁️';
+            let statusClass = '';
+            let title = 'Cloud Sync: ' + state.syncId;
+
+            if (state.syncStatus === 'syncing' || state.syncStatus === 'connecting') {
+              icon = '⏳';
+              statusClass = ' syncing';
+              title = 'Syncing...';
+            } else if (state.syncStatus === 'connected') {
+              icon = '☁️✓';
+              title = 'Connected: ' + state.syncId;
+            } else if (state.syncStatus === 'disconnected') {
+              icon = '☁️⚡';
+              statusClass = ' disconnected';
+              title = 'Reconnecting...';
+            } else if (state.syncStatus === 'error') {
+              icon = '☁️✗';
+              statusClass = ' error';
+              title = 'Sync Error';
+            }
+
+            return '<button class="header-btn sync-indicator' + statusClass + '" onclick="openSettingsModal()" title="' + escapeAttr(title) + '">' + icon + '</button>';
+          } else if (state.firebaseConfig) {
+            // Firebase configured but not syncing
+            return '<button class="header-btn" onclick="openSettingsModal()" title="Cloud Sync Available" style="opacity:0.6">☁️</button>';
+          }
+          return '';
+        })() +
+        '<button class="header-btn" onclick="importFromJSON()" title="Import JSON">📤</button>' +
+        '<button class="header-btn" onclick="exportToJSON()" title="Export JSON">📥</button>' +
+        '<button class="header-btn" onclick="openSettingsModal()">⚙️</button>' +
+        '</div></header>' +
+        
+        (state.view === 'braindump' ? (function() {
+          const hasImages = state.uploadedImages.length > 0;
+          const canScanContacts = state.apiKey && state.braveApiKey;
+
+          return '<div class="braindump-container">' +
+          '<div class="braindump-header"><h2>🧠 Brain Dump</h2><p>Type anything. AI will parse and create tasks & contacts.</p></div>' +
+          '<textarea id="braindumpInput" class="braindump-input" placeholder="Example: Met with John from Acme Corp today, need to follow up next week about the proposal. Also buy milk and eggs."></textarea>' +
+          '<div class="braindump-actions">' +
+          '<span class="braindump-hint">' + (state.apiKey ? '✓ AI ready' : '⚠️ Set API key in Settings') + '</span>' +
+          '<button class="process-btn" onclick="processBrainDump()"' + (!state.apiKey ? ' disabled' : '') + '>✨ Process Text</button>' +
+          '</div>' +
+          processingHtml +
+
+          // Image drop zone for contact scanning
+          '<div style="border-top:1px solid var(--border);margin-top:24px;padding-top:24px">' +
+          '<h3 style="font-size:14px;margin-bottom:8px">📷 Scan Contacts from Images</h3>' +
+          '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Drop screenshots of LinkedIn profiles, business cards, or contact lists</p>' +
+          '<div class="image-drop-zone" id="imageDropZone" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleImageDrop(event)" onclick="document.getElementById(\'imageFileInput\').click()">' +
+          '<div class="image-drop-zone-icon">📸</div>' +
+          '<div class="image-drop-zone-text">Drop images here or click to upload</div>' +
+          '<div class="image-drop-zone-hint">PNG, JPG, WEBP supported</div>' +
+          '</div>' +
+          '<input type="file" id="imageFileInput" accept="image/*" multiple style="display:none" onchange="handleImageSelect(event)">' +
+
+          // Image previews
+          (hasImages ?
+            '<div class="image-preview-grid">' +
+            state.uploadedImages.map((img, idx) =>
+              '<div class="image-preview-item">' +
+              '<img src="' + img.dataUrl + '" alt="' + escapeAttr(img.name) + '">' +
+              '<button class="image-preview-remove" onclick="event.stopPropagation();removeImage(' + idx + ')">×</button>' +
+              '</div>'
+            ).join('') +
+            '</div>' +
+            '<button class="scan-contacts-btn" onclick="processImagesForContacts()"' + (!canScanContacts ? ' disabled' : '') + '>🔍 Scan ' + state.uploadedImages.length + ' Image(s) for Contacts</button>' +
+            (!canScanContacts ? '<div class="scan-warning">⚠️ Set both API keys in Settings to scan contacts</div>' : '')
+            : ''
+          ) +
+          '</div>' +
+          '</div>';
+        })() : '') +
+        
+        (state.view === 'today' ? (function() {
+          // Filter out done tasks from today view
+          const activeTodayTasks = today.tasks.filter(t => t.status !== 'done');
+          return '<div class="search-container"><div class="search-bar"><span>🔍</span><input type="text" placeholder="Search..." value="' + escapeAttr(state.filters.search) + '" oninput="handleSearch(this.value)"></div></div>' +
+          '<div class="today-container">' +
+          '<div class="today-section"><div class="today-section-title">📋 Tasks <span class="count-badge ' + (activeTodayTasks.length ? 'urgent' : '') + '">' + activeTodayTasks.length + '</span></div>' +
+          '<div class="task-list">' + (activeTodayTasks.length ? activeTodayTasks.map(t => renderTaskCard(t, true)).join('') : '<div class="empty-state">No urgent tasks 🎉</div>') + '</div></div>' +
+          '<div class="today-section"><div class="today-section-title">👥 Outreach <span class="count-badge ' + (today.contacts.length ? 'urgent' : '') + '">' + today.contacts.length + '</span></div>' +
+          (today.contacts.length ? today.contacts.map(renderContactCard).join('') : '<div class="empty-state">No outreach due 🎉</div>') + '</div>' +
+          '</div>';
+        })() : '') +
+        
+        (state.view === 'kanban' ? (function() {
+          const doneTasks = getDoneTasks();
+          const getActiveTasksByBucket = (bucket) => {
+            return filterTasks(state.tasks.filter(t => t.bucket === bucket && t.status !== 'done'));
+          };
+
+          return '<div class="search-container"><div class="search-bar"><span>🔍</span><input type="text" placeholder="Search tasks..." value="' + escapeAttr(state.filters.search) + '" oninput="handleSearch(this.value)"><span class="keyboard-hint">/</span></div></div>' +
+          '<div class="board-header"><div class="board-title">Tasks</div><span class="keyboard-hint" style="font-size:11px;color:var(--text-muted)">N: New task</span></div>' +
+          '<div class="kanban-container">' +
+          state.buckets.map(bucket => {
+            const tasks = getActiveTasksByBucket(bucket);
+            const isEditing = state.editingBucket === bucket;
+            const escapedBucket = escapeAttr(bucket).replace(/'/g, "\\'");
+            return '<div class="bucket" data-bucket="' + escapeAttr(bucket) + '">' +
+              '<div class="bucket-header">' +
+              (isEditing ?
+                '<input type="text" id="bucketNameInput" class="bucket-name-input" value="' + escapeAttr(bucket) + '" onblur="finishRenameBucket(\'' + escapedBucket + '\',this.value)" onkeypress="if(event.key===\'Enter\')this.blur()">' :
+                '<span class="bucket-name" onclick="startRenameBucket(\'' + escapedBucket + '\')">' + escapeHtml(bucket) + '</span>') +
+              '<div class="bucket-actions"><span class="bucket-count">' + tasks.length + '</span>' +
+              '<button class="bucket-delete" onclick="deleteBucket(\'' + escapedBucket + '\')">×</button></div></div>' +
+              '<div class="bucket-body">' +
+              '<div class="add-task-inline" onclick="openAddTaskModal(\'' + escapedBucket + '\')">+ Add task</div>' +
+              '<div class="task-list" ondragover="handleBucketDragOver(event)" ondragleave="handleBucketDragLeave(event)" ondrop="handleBucketDrop(event,\'' + escapedBucket + '\')">' +
+              tasks.map(t => renderTaskCard(t, true)).join('') +
+              '</div></div></div>';
+          }).join('') +
+          '<div class="add-bucket-column" onclick="addNewBucket()">+ New Bucket</div>' +
+          '</div>' +
+          // Done tasks collapsible section
+          (doneTasks.length > 0 ?
+            '<div class="done-tasks-section">' +
+            '<div class="done-tasks-header" onclick="toggleDoneTasksVisibility()">' +
+            '<span class="done-tasks-toggle ' + (state.showDoneTasks ? 'expanded' : '') + '">▶</span>' +
+            '<span class="done-tasks-title">Completed Tasks</span>' +
+            '<span class="done-tasks-count">' + doneTasks.length + '</span>' +
+            '</div>' +
+            '<div class="done-tasks-list ' + (state.showDoneTasks ? 'expanded' : '') + '">' +
+            doneTasks.map(t =>
+              '<div class="done-task-card">' +
+              '<span class="done-task-title">' + escapeHtml(t.title) + '</span>' +
+              '<button class="done-task-undo" onclick="markTaskDone(' + t.id + ',event)">Undo</button>' +
+              '</div>'
+            ).join('') +
+            '</div>' +
+            '</div>'
+            : ''
+          );
+        })() : '') +
+        
+        (state.view === 'crm' ? (function() {
+          const filteredCrmContacts = filterContacts(state.contacts);
+          const overdueCount = state.contacts.filter(c => isOverdue(c.nextStepDate)).length;
+          const geoTags = getUniqueGeoTags();
+          const secTags = getUniqueSecTags();
+          const strengths = getUniqueStrengths();
+          const activeFilters = getActiveFilterCount();
+
+          return '<div class="search-container"><div class="search-bar"><span>🔍</span><input type="text" placeholder="Search contacts..." value="' + escapeAttr(state.filters.search) + '" oninput="handleSearch(this.value)"><span class="keyboard-hint">/</span></div></div>' +
+          '<div class="crm-filter-bar">' +
+          '<span class="filter-label">Filters:</span>' +
+          (geoTags.length ? '<select onchange="setCrmGeoFilter(this.value)"><option value="">All Regions</option>' + geoTags.map(t => '<option value="' + escapeAttr(t) + '"' + (state.crmGeoFilter === t ? ' selected' : '') + '>' + escapeHtml(t) + '</option>').join('') + '</select>' : '') +
+          (secTags.length ? '<select onchange="setCrmSecFilter(this.value)"><option value="">All Sectors</option>' + secTags.map(t => '<option value="' + escapeAttr(t) + '"' + (state.crmSecFilter === t ? ' selected' : '') + '>' + escapeHtml(t) + '</option>').join('') + '</select>' : '') +
+          (strengths.length ? '<select onchange="setCrmStrengthFilter(this.value)"><option value="">All Strengths</option>' + strengths.map(s => '<option value="' + escapeAttr(s) + '"' + (state.crmStrengthFilter === s ? ' selected' : '') + '>' + escapeHtml(s) + '</option>').join('') + '</select>' : '') +
+          '<select onchange="setCrmLastContactedFilter(this.value)">' +
+          '<option value="">Last Contacted</option>' +
+          '<option value="week"' + (state.crmLastContactedFilter === 'week' ? ' selected' : '') + '>This Week</option>' +
+          '<option value="month"' + (state.crmLastContactedFilter === 'month' ? ' selected' : '') + '>This Month</option>' +
+          '<option value="30days_ago"' + (state.crmLastContactedFilter === '30days_ago' ? ' selected' : '') + '>Not in 30 days</option>' +
+          '<option value="90days_ago"' + (state.crmLastContactedFilter === '90days_ago' ? ' selected' : '') + '>Not in 90 days</option>' +
+          '</select>' +
+          (activeFilters > 0 ? '<span class="filter-count">' + activeFilters + ' active</span><button class="clear-filters-btn" onclick="clearAllCrmFilters()">Clear All</button>' : '') +
+          '</div>' +
+          '<div class="crm-container">' +
+          '<div class="crm-header">' +
+          '<div class="crm-stats">' +
+          '<div class="stat-card' + (state.crmFilter === 'all' ? ' active' : '') + '" onclick="setCrmFilter(\'all\')"><div class="stat-value">' + state.contacts.length + '</div><div class="stat-label">Total</div></div>' +
+          '<div class="stat-card' + (state.crmFilter === 'overdue' ? ' active' : '') + '" onclick="setCrmFilter(\'overdue\')"><div class="stat-value" style="color:#FCA5A5">' + overdueCount + '</div><div class="stat-label">Overdue</div></div>' +
+          '</div>' +
+          '<div class="crm-actions">' +
+          '<button class="btn btn-secondary btn-sm" onclick="exportContactsCSV()">📊 Export' + (activeFilters > 0 ? ' (' + filteredCrmContacts.length + ')' : '') + '</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="openAddContactModal()">+ Add Contact<span class="keyboard-hint"> (C)</span></button>' +
+          '</div></div>' +
+          (filteredCrmContacts.length === 0 ? '<div class="empty-state" style="padding:40px">No contacts match your filters</div>' : '<div class="contact-list">' + filteredCrmContacts.map(renderContactCard).join('') + '</div>') +
+          '</div>';
+        })() : '') +
+        
+        renderModal() +
+        (state.toast ? '<div class="toast">' + escapeHtml(state.toast) + '</div>' : ''); 
+      
+      if (scrollPos) {
+        const newKanban = document.querySelector('.kanban-container');
+        if (newKanban) requestAnimationFrame(() => { newKanban.scrollLeft = scrollPos; });
+      }
+
+      // Restore search input focus and cursor position
+      if (wasSearchFocused) {
+        const searchInput = document.querySelector('.search-bar input');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.setSelectionRange(searchCursorPos, searchCursorEnd);
+        }
+      }
+    }
+
+    // Initialize
+    loadData();
+    loadFirebaseConfig(); // Load Firebase config first
+    loadSyncSettings();   // Then load sync settings (will start real-time sync if configured)
+    render();
+
+    // Auto-reconnect to Firebase sync on startup
+    if (state.syncId && state.syncEnabled && firebaseDb) {
+      setTimeout(() => {
+        startRealtimeSync();
+      }, 500);
+    }
+
+    // === EVENT LISTENERS (attached once, not in render) ===
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      // ESC closes modal
+      if (e.key === 'Escape' && state.modal) {
+        closeModal();
+        return;
+      }
+
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target.matches('input, textarea, select')) return;
+
+      // N - New task (opens add task modal for first bucket)
+      if (e.key === 'n' || e.key === 'N') {
+        if (!state.modal && state.view === 'kanban' && state.buckets.length > 0) {
+          e.preventDefault();
+          openAddTaskModal(state.buckets[0]);
+        }
+      }
+
+      // / - Focus search
+      if (e.key === '/') {
+        const searchInput = document.querySelector('.search-bar input');
+        if (searchInput && !state.modal) {
+          e.preventDefault();
+          searchInput.focus();
+        }
+      }
+
+      // C - New contact (in CRM view)
+      if ((e.key === 'c' || e.key === 'C') && state.view === 'crm' && !state.modal) {
+        e.preventDefault();
+        openAddContactModal();
+      }
+    });
+
+    // Wheel scroll on kanban
+    document.addEventListener('wheel', e => {
+      const k = document.querySelector('.kanban-container');
+      if (k && k.contains(e.target)) {
+        e.preventDefault();
+        k.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+
+    // Drag to scroll kanban
+    let isDrag = false, startX, scrollL;
+    document.addEventListener('mousedown', e => {
+      const k = document.querySelector('.kanban-container');
+      if (!k) return;
+      if (e.target.closest('.task-card') || e.target.closest('.add-task-inline') || e.target.closest('.bucket-header')) return;
+      if (k.contains(e.target)) {
+        isDrag = true;
+        startX = e.pageX - k.offsetLeft;
+        scrollL = k.scrollLeft;
+        k.style.cursor = 'grabbing';
+      }
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!isDrag) return;
+      e.preventDefault();
+      const k = document.querySelector('.kanban-container');
+      if (!k) return;
+      k.scrollLeft = scrollL - (e.pageX - k.offsetLeft - startX) * 1.5;
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDrag = false;
+      const k = document.querySelector('.kanban-container');
+      if (k) k.style.cursor = 'grab';
+    });
+
+    // Reset drag state on window blur (Phase 4 fix)
+    window.addEventListener('blur', () => {
+      isDrag = false;
+      draggedTaskId = null;
+      dragOverTaskId = null;
+      dragPosition = null;
+      document.querySelectorAll('.task-card').forEach(el => el.classList.remove('dragging', 'drag-above', 'drag-below'));
+      document.querySelectorAll('.task-list').forEach(el => el.classList.remove('drag-over'));
+    });
+
+    // Auto-focus input fields in modals
+    const modalObserver = new MutationObserver(() => {
+      const modal = document.querySelector('.modal');
+      if (modal) {
+        const firstInput = modal.querySelector('input[type="text"]:not([type="hidden"]), textarea');
+        if (firstInput && document.activeElement !== firstInput) {
+          setTimeout(() => firstInput.focus(), 50);
+        }
+      }
+    });
+    modalObserver.observe(document.getElementById('app'), { childList: true, subtree: true });
+
+    // Touch swipe support for kanban on mobile
+    let touchStartX = 0;
+    let touchStartScrollLeft = 0;
+    document.addEventListener('touchstart', e => {
+      const k = document.querySelector('.kanban-container');
+      if (k && k.contains(e.target) && !e.target.closest('.task-card')) {
+        touchStartX = e.touches[0].clientX;
+        touchStartScrollLeft = k.scrollLeft;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+      const k = document.querySelector('.kanban-container');
+      if (k && touchStartX && k.contains(e.target) && !e.target.closest('.task-card')) {
+        const diff = touchStartX - e.touches[0].clientX;
+        k.scrollLeft = touchStartScrollLeft + diff;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+      touchStartX = 0;
+    });
+
+    // Cleanup Firebase sync on page unload
+    window.addEventListener('beforeunload', () => {
+      if (firebaseDb && state.syncId && state.syncEnabled) {
+        // Try to decrement device count (best effort, may not complete)
+        const ref = firebaseDb.ref('planners/' + state.syncId + '/deviceCount');
+        ref.transaction((count) => Math.max(0, (count || 1) - 1));
+        stopRealtimeSync();
+      }
+    });
+  </script>
+</body>
+</html>
