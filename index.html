@@ -409,6 +409,8 @@
       uploadedImages: [],    // Array of {dataUrl, name} objects
       pendingContacts: [],   // Contacts extracted, awaiting confirmation
       selectedPendingContacts: new Set(), // IDs of contacts selected for import
+      // Brain dump images (for OCR)
+      braindumpImages: [],   // Array of {dataUrl, name} objects for OCR processing
       // Done tasks visibility
       showDoneTasks: false
     };
@@ -1487,13 +1489,51 @@
       }));
     }
 
-    // Brain Dump Processing
+    // Brain dump image handling
+    function handleBraindumpImageDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      files.forEach(addBraindumpImage);
+    }
+
+    function handleBraindumpImageSelect(e) {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+      files.forEach(addBraindumpImage);
+      e.target.value = '';
+    }
+
+    function addBraindumpImage(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state.braindumpImages.push({
+          dataUrl: e.target.result,
+          name: file.name
+        });
+        render();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeBraindumpImage(index) {
+      state.braindumpImages.splice(index, 1);
+      render();
+    }
+
+    function clearBraindumpImages() {
+      state.braindumpImages = [];
+      render();
+    }
+
+    // Brain Dump Processing (supports text + images with OCR)
     async function processBrainDump() {
       const input = document.getElementById('braindumpInput');
       const text = input ? input.value.trim() : '';
+      const hasImages = state.braindumpImages.length > 0;
 
-      if (!text) {
-        showToast('Enter some text first');
+      if (!text && !hasImages) {
+        showToast('Enter some text or add images first');
         return;
       }
 
@@ -1502,7 +1542,7 @@
         return;
       }
 
-      state.processing = { status: 'processing', message: 'Analyzing your input...' };
+      state.processing = { status: 'processing', message: hasImages ? 'Reading images & analyzing...' : 'Analyzing your input...' };
       render();
 
       try {
@@ -1557,7 +1597,33 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   "summary": "Brief summary"
 }
 
-The "peopleToSearch" array should include names of people mentioned where you're unsure about their details and web search would help.`;
+The "peopleToSearch" array should include names of people mentioned where you're unsure about their details and web search would help.
+
+If images are provided, first OCR/read any text from them (handwritten notes, screenshots, etc.) and combine with any typed text.`;
+
+        // Build message content - text and/or images
+        let messageContent;
+        if (hasImages) {
+          messageContent = [];
+          // Add images first
+          state.braindumpImages.forEach(img => {
+            messageContent.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: img.dataUrl.split(';')[0].split(':')[1],
+                data: img.dataUrl.split(',')[1]
+              }
+            });
+          });
+          // Add text instruction
+          const textInstruction = text
+            ? 'Read any text from the images above (OCR), then combine with this additional text and process everything:\n\n' + text
+            : 'Read any text from the images above (OCR for handwritten notes, screenshots, etc.) and process the content.';
+          messageContent.push({ type: 'text', text: textInstruction });
+        } else {
+          messageContent = text;
+        }
 
         const response = await fetch(ANTHROPIC_API_URL, {
           method: 'POST',
@@ -1570,7 +1636,7 @@ The "peopleToSearch" array should include names of people mentioned where you're
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 2048,
-            messages: [{ role: 'user', content: text }],
+            messages: [{ role: 'user', content: messageContent }],
             system: systemPrompt
           })
         });
@@ -1720,6 +1786,7 @@ Only include fields you're confident about from the search results.`;
         const summary = parsed.summary || `Added ${parsed.tasks.length} task(s) and ${parsed.contacts.length} contact(s)`;
         state.processing = { status: 'done', message: summary };
         input.value = '';
+        state.braindumpImages = []; // Clear images after processing
         render();
 
         setTimeout(() => {
@@ -2343,22 +2410,49 @@ Only include fields you're confident about.`;
         '</div></header>' +
         
         (state.view === 'braindump' ? (function() {
-          const hasImages = state.uploadedImages.length > 0;
+          const hasContactImages = state.uploadedImages.length > 0;
+          const hasBraindumpImages = state.braindumpImages.length > 0;
           const canScanContacts = state.apiKey && state.braveApiKey;
+          const canProcess = state.apiKey;
 
           return '<div class="braindump-container">' +
-          '<div class="braindump-header"><h2>🧠 Brain Dump</h2><p>Type anything. AI will parse and create tasks & contacts.</p></div>' +
-          '<textarea id="braindumpInput" class="braindump-input" placeholder="Example: Met with John from Acme Corp today, need to follow up next week about the proposal. Also buy milk and eggs."></textarea>' +
+          '<div class="braindump-header"><h2>🧠 Brain Dump</h2><p>Type or drop images (handwritten notes, screenshots). AI will OCR and parse.</p></div>' +
+
+          // Main brain dump area with image support
+          '<div style="position:relative">' +
+          '<textarea id="braindumpInput" class="braindump-input" placeholder="Type here... or drop/upload images of handwritten notes, screenshots, etc."></textarea>' +
+
+          // Image drop overlay for braindump
+          '<div class="image-drop-zone" style="margin-top:12px;padding:16px" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleBraindumpImageDrop(event)" onclick="document.getElementById(\'braindumpImageInput\').click()">' +
+          '<span style="font-size:20px">📷</span> ' +
+          '<span style="font-size:12px">Drop or click to add images (handwritten notes, screenshots)</span>' +
+          '</div>' +
+          '<input type="file" id="braindumpImageInput" accept="image/*" multiple style="display:none" onchange="handleBraindumpImageSelect(event)">' +
+
+          // Braindump image previews
+          (hasBraindumpImages ?
+            '<div class="image-preview-grid" style="margin-top:12px">' +
+            state.braindumpImages.map((img, idx) =>
+              '<div class="image-preview-item">' +
+              '<img src="' + img.dataUrl + '" alt="' + escapeAttr(img.name) + '">' +
+              '<button class="image-preview-remove" onclick="event.stopPropagation();removeBraindumpImage(' + idx + ')">×</button>' +
+              '</div>'
+            ).join('') +
+            '</div>'
+            : ''
+          ) +
+          '</div>' +
+
           '<div class="braindump-actions">' +
-          '<span class="braindump-hint">' + (state.apiKey ? '✓ AI ready' : '⚠️ Set API key in Settings') + '</span>' +
-          '<button class="process-btn" onclick="processBrainDump()"' + (!state.apiKey ? ' disabled' : '') + '>✨ Process Text</button>' +
+          '<span class="braindump-hint">' + (canProcess ? '✓ AI ready' + (hasBraindumpImages ? ' (' + state.braindumpImages.length + ' image' + (state.braindumpImages.length > 1 ? 's' : '') + ')' : '') : '⚠️ Set API key in Settings') + '</span>' +
+          '<button class="process-btn" onclick="processBrainDump()"' + (!canProcess ? ' disabled' : '') + '>✨ Process' + (hasBraindumpImages ? ' with OCR' : '') + '</button>' +
           '</div>' +
           processingHtml +
 
-          // Image drop zone for contact scanning
+          // Image drop zone for contact scanning (separate feature)
           '<div style="border-top:1px solid var(--border);margin-top:24px;padding-top:24px">' +
-          '<h3 style="font-size:14px;margin-bottom:8px">📷 Scan Contacts from Images</h3>' +
-          '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Drop screenshots of LinkedIn profiles, business cards, or contact lists</p>' +
+          '<h3 style="font-size:14px;margin-bottom:8px">📇 Scan Contacts from Images</h3>' +
+          '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">LinkedIn profiles, business cards, contact lists → enriched with web search</p>' +
           '<div class="image-drop-zone" id="imageDropZone" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleImageDrop(event)" onclick="document.getElementById(\'imageFileInput\').click()">' +
           '<div class="image-drop-zone-icon">📸</div>' +
           '<div class="image-drop-zone-text">Drop images here or click to upload</div>' +
@@ -2366,8 +2460,8 @@ Only include fields you're confident about.`;
           '</div>' +
           '<input type="file" id="imageFileInput" accept="image/*" multiple style="display:none" onchange="handleImageSelect(event)">' +
 
-          // Image previews
-          (hasImages ?
+          // Contact scanning image previews
+          (hasContactImages ?
             '<div class="image-preview-grid">' +
             state.uploadedImages.map((img, idx) =>
               '<div class="image-preview-item">' +
