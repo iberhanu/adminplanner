@@ -45,6 +45,12 @@
     .process-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3); }
     .process-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .processing-status { margin-top: 16px; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border); }
+    /* Global processing overlay */
+    .processing-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; }
+    .processing-overlay .spinner { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .processing-overlay .message { font-size: 16px; color: var(--text-primary); margin-bottom: 8px; text-align: center; max-width: 300px; }
+    .processing-overlay .submessage { font-size: 12px; color: var(--text-muted); }
     .status-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -71,7 +77,13 @@
     .view-btn.active { background: rgba(255,255,255,0.08); color: var(--text-primary); }
     .kanban-container { display: flex; gap: 12px; padding: 16px; overflow-x: auto; min-height: calc(100vh - 280px); -webkit-overflow-scrolling: touch; scroll-behavior: smooth; cursor: grab; }
     .kanban-container:active { cursor: grabbing; }
-    .bucket { background: rgba(255,255,255,0.02); border-radius: 10px; min-width: 280px; max-width: 280px; border: 1px solid var(--border); display: flex; flex-direction: column; max-height: calc(100vh - 180px); }
+    .bucket { background: rgba(255,255,255,0.02); border-radius: 10px; min-width: 280px; max-width: 280px; border: 1px solid var(--border); display: flex; flex-direction: column; max-height: calc(100vh - 180px); transition: transform 0.2s, border-color 0.2s; }
+    .bucket.dragging { opacity: 0.5; }
+    .bucket.drag-left { border-left: 3px solid var(--accent); }
+    .bucket.drag-right { border-right: 3px solid var(--accent); }
+    .bucket-drag-handle { cursor: grab; padding: 4px 6px; margin-right: 4px; color: var(--text-muted); font-size: 12px; opacity: 0.5; transition: opacity 0.2s; }
+    .bucket-header:hover .bucket-drag-handle { opacity: 1; }
+    .bucket-drag-handle:active { cursor: grabbing; }
     .bucket-header { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0; }
     .bucket-name { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; }
     .bucket-name:hover { background: rgba(255,255,255,0.05); }
@@ -714,6 +726,69 @@
     let dragOverTaskId = null;
     let dragPosition = null;
 
+    // Bucket drag reordering
+    let draggedBucket = null;
+    let dragOverBucket = null;
+
+    function handleBucketDragStart(e, bucket) {
+      draggedBucket = bucket;
+      e.target.closest('.bucket').classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleBucketDragEnd(e) {
+      const bucketEl = e.target.closest('.bucket');
+      if (bucketEl) bucketEl.classList.remove('dragging');
+      document.querySelectorAll('.bucket').forEach(el => el.classList.remove('drag-left', 'drag-right'));
+      draggedBucket = null;
+      dragOverBucket = null;
+    }
+
+    function handleBucketDragOver(e, bucket) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!draggedBucket || bucket === draggedBucket) return;
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      const pos = e.clientX < midX ? 'left' : 'right';
+
+      if (dragOverBucket !== bucket) {
+        document.querySelectorAll('.bucket').forEach(el => el.classList.remove('drag-left', 'drag-right'));
+        e.currentTarget.classList.add('drag-' + pos);
+        dragOverBucket = bucket;
+      }
+    }
+
+    function handleBucketDrop(e, targetBucket) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!draggedBucket || draggedBucket === targetBucket) return;
+
+      const fromIdx = state.buckets.indexOf(draggedBucket);
+      const toIdx = state.buckets.indexOf(targetBucket);
+
+      if (fromIdx === -1 || toIdx === -1) return;
+
+      // Remove from current position
+      state.buckets.splice(fromIdx, 1);
+
+      // Insert at new position
+      const newToIdx = state.buckets.indexOf(targetBucket);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const insertAfter = e.clientX > rect.left + rect.width / 2;
+
+      if (insertAfter) {
+        state.buckets.splice(newToIdx + 1, 0, draggedBucket);
+      } else {
+        state.buckets.splice(newToIdx, 0, draggedBucket);
+      }
+
+      saveData();
+      render();
+    }
+
     function handleDragStart(e, id) { 
       draggedTaskId = id; 
       e.target.classList.add('dragging'); 
@@ -783,21 +858,21 @@
       render();
     }
     
-    function handleBucketDragOver(e) { 
-      e.preventDefault(); 
-      e.currentTarget.classList.add('drag-over'); 
+    function handleTaskListDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
     }
-    
-    function handleBucketDragLeave(e) { 
-      e.currentTarget.classList.remove('drag-over'); 
-    }
-    
-    function handleBucketDrop(e, bucket) { 
-      e.preventDefault(); 
+
+    function handleTaskListDragLeave(e) {
       e.currentTarget.classList.remove('drag-over');
-      
+    }
+
+    function handleTaskListDrop(e, bucket) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+
       if (!draggedTaskId) return;
-      
+
       // If dropped on empty area (not on a task), add to end
       if (!dragOverTaskId) {
         const task = state.tasks.find(t => t.id === draggedTaskId);
@@ -806,7 +881,7 @@
           saveData();
         }
       }
-      
+
       render();
     }
 
@@ -2671,8 +2746,9 @@ Include all fields you can determine from the search.`;
             const tasks = getActiveTasksByBucket(bucket);
             const isEditing = state.editingBucket === bucket;
             const escapedBucket = escapeAttr(bucket).replace(/'/g, "\\'");
-            return '<div class="bucket" data-bucket="' + escapeAttr(bucket) + '">' +
+            return '<div class="bucket" data-bucket="' + escapeAttr(bucket) + '" draggable="true" ondragstart="handleBucketDragStart(event,\'' + escapedBucket + '\')" ondragend="handleBucketDragEnd(event)" ondragover="handleBucketDragOver(event,\'' + escapedBucket + '\')" ondrop="handleBucketDrop(event,\'' + escapedBucket + '\')">' +
               '<div class="bucket-header">' +
+              '<span class="bucket-drag-handle" title="Drag to reorder">⋮⋮</span>' +
               (isEditing ?
                 '<input type="text" id="bucketNameInput" class="bucket-name-input" value="' + escapeAttr(bucket) + '" onblur="finishRenameBucket(\'' + escapedBucket + '\',this.value)" onkeypress="if(event.key===\'Enter\')this.blur()">' :
                 '<span class="bucket-name" onclick="startRenameBucket(\'' + escapedBucket + '\')">' + escapeHtml(bucket) + '</span>') +
@@ -2680,7 +2756,7 @@ Include all fields you can determine from the search.`;
               '<button class="bucket-delete" onclick="deleteBucket(\'' + escapedBucket + '\')">×</button></div></div>' +
               '<div class="bucket-body">' +
               '<div class="add-task-inline" onclick="openAddTaskModal(\'' + escapedBucket + '\')">+ Add task</div>' +
-              '<div class="task-list" ondragover="handleBucketDragOver(event)" ondragleave="handleBucketDragLeave(event)" ondrop="handleBucketDrop(event,\'' + escapedBucket + '\')">' +
+              '<div class="task-list" ondragover="handleTaskListDragOver(event)" ondragleave="handleTaskListDragLeave(event)" ondrop="handleTaskListDrop(event,\'' + escapedBucket + '\')">' +
               tasks.map(t => renderTaskCard(t, true)).join('') +
               '</div></div></div>';
           }).join('') +
@@ -2745,7 +2821,15 @@ Include all fields you can determine from the search.`;
         })() : '') +
         
         renderModal() +
-        (state.toast ? '<div class="toast">' + escapeHtml(state.toast) + '</div>' : ''); 
+        (state.toast ? '<div class="toast">' + escapeHtml(state.toast) + '</div>' : '') +
+        // Global processing overlay - visible from any screen
+        (state.processing && state.processing.status === 'processing' ?
+          '<div class="processing-overlay">' +
+          '<div class="spinner"></div>' +
+          '<div class="message">' + escapeHtml(state.processing.message) + '</div>' +
+          '<div class="submessage">Please wait...</div>' +
+          '</div>'
+          : ''); 
       
       // Restore ALL scroll positions
       requestAnimationFrame(() => {
