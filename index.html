@@ -432,6 +432,7 @@
       uploadedImages: [],    // Array of {dataUrl, name} objects
       pendingContacts: [],   // Contacts extracted, awaiting confirmation
       selectedPendingContacts: new Set(), // IDs of contacts selected for import
+      pendingCrmUpdates: [],  // Quick CRM updates awaiting confirmation
       // Brain dump images (for OCR)
       braindumpImages: [],   // Array of {dataUrl, name} objects for OCR processing
       // Done tasks visibility
@@ -2058,22 +2059,33 @@ If no contacts are found, return {"contacts": [], "summary": "No contacts found"
           const searchResults = await searchForPerson(contact.name, contact.company);
 
           if (searchResults && searchResults.length > 0) {
+            // Get existing tags to prefer reusing them
+            const existingGeoTags = [...new Set(state.contacts.flatMap(c => c.geoTags || []))];
+            const existingSecTags = [...new Set(state.contacts.flatMap(c => c.secTags || []))];
+
             // Send to Claude for enrichment - correct OCR errors and add missing info
             const enrichPrompt = `Based on these search results, CORRECT and ENRICH this contact's info.
 
 Search results for "${contact.name}":
-${searchResults.map(r => '- ' + r.title + ': ' + r.description).join('\n')}
+${searchResults.map(r => '- ' + r.title + ' (' + r.url + '): ' + r.description).join('\n')}
 
 Current info (may have OCR errors/misspellings): ${JSON.stringify(contact)}
 
-IMPORTANT:
+EXISTING TAGS IN MY CRM (PREFER THESE):
+- Geo tags: ${existingGeoTags.length ? existingGeoTags.join(', ') : 'None yet'}
+- Sector tags: ${existingSecTags.length ? existingSecTags.join(', ') : 'None yet'}
+
+RULES:
 1. CORRECT any misspelled names or company names based on search results
-2. Add the person's location/geography to geoTags (country, region)
-3. Add their industry/sector to secTags
+2. For geoTags: Use COUNTRY level (not cities). Include geographic hierarchy: country, region, continent.
+   Example: Someone in Addis Ababa → ["Ethiopia", "East Africa", "Africa"]
+   Example: Someone in London → ["UK", "Europe"]
+3. For secTags: STRONGLY PREFER existing tags above. Only create new if truly different.
+   Example: If "Healthcare" exists, use it instead of creating "Healthcare/Pharma" or "Health"
 4. Find their correct job title/role
 
-Return ONLY JSON with corrected and enriched info:
-{"name": "Corrected Full Name", "company": "Correct Company Name", "role": "Job Title", "geoTags": ["Country", "Region"], "secTags": ["Industry"]}
+Return ONLY JSON:
+{"name": "Corrected Full Name", "company": "Correct Company Name", "role": "Job Title", "geoTags": ["Country", "Region", "Continent"], "secTags": ["Industry"]}
 Include ALL fields with your best information from the search.`;
 
             try {
@@ -2208,14 +2220,27 @@ Include ALL fields with your best information from the search.`;
           const searchResults = await searchForPerson(contact.name, contact.company);
 
           if (searchResults && searchResults.length > 0) {
-            const enrichPrompt = `Based on these search results, find info about "${contact.name}".
+            // Get existing tags to prefer reusing them
+            const existingGeoTags = [...new Set(state.contacts.flatMap(c => c.geoTags || []))];
+            const existingSecTags = [...new Set(state.contacts.flatMap(c => c.secTags || []))];
+
+            const enrichPrompt = `Based on these search results, find and CORRECT info about "${contact.name}".
 
 Search results:
-${searchResults.map(r => '- ' + r.title + ': ' + r.description).join('\n')}
+${searchResults.map(r => '- ' + r.title + ' (' + r.url + '): ' + r.description).join('\n')}
 
-Return ONLY JSON with the person's info:
-{"name": "Full Name", "company": "Company", "role": "Job Title", "geoTags": ["Country"], "secTags": ["Industry"]}
-Include all fields you can determine from the search.`;
+EXISTING TAGS IN MY CRM (PREFER THESE):
+- Geo tags: ${existingGeoTags.length ? existingGeoTags.join(', ') : 'None yet'}
+- Sector tags: ${existingSecTags.length ? existingSecTags.join(', ') : 'None yet'}
+
+RULES:
+1. CAPITALIZE names properly (e.g., "john smith" → "John Smith")
+2. Extract their company and job title from search results
+3. For geoTags: Use COUNTRY level (not cities). Include hierarchy: country, region, continent.
+4. For secTags: PREFER existing tags above. Only create new if truly different.
+
+Return ONLY valid JSON (no other text):
+{"name": "John Smith", "company": "Company Inc", "role": "CEO", "geoTags": ["USA", "North America"], "secTags": ["Technology"]}`;
 
             try {
               const enrichResponse = await fetch(ANTHROPIC_API_URL, {
@@ -2272,6 +2297,151 @@ Include all fields you can determine from the search.`;
         state.processing = { status: 'error', message: 'Error: ' + err.message };
         render();
       }
+    }
+
+    // Process natural language CRM updates
+    async function processQuickCrmUpdate() {
+      const input = document.getElementById('quickCrmInput');
+      const text = input ? input.value.trim() : '';
+
+      if (!text) {
+        showToast('Type an update first');
+        return;
+      }
+
+      if (!state.apiKey) {
+        showToast('Set API key in Settings first');
+        return;
+      }
+
+      state.processing = { status: 'processing', message: 'Understanding your request...' };
+      render();
+
+      try {
+        // Get today's date for context
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+
+        // Build contact list for matching
+        const contactList = state.contacts.map(c => ({ id: c.id, name: c.name, company: c.company }));
+
+        const prompt = `Parse this CRM update request and identify what changes to make.
+
+User input: "${text}"
+
+Today is ${dayOfWeek}, ${dateStr}.
+
+EXISTING CONTACTS:
+${contactList.map(c => '- ID ' + c.id + ': ' + c.name + (c.company ? ' (' + c.company + ')' : '')).join('\n')}
+
+Parse the user's input and return JSON with the updates to make:
+{
+  "updates": [
+    {
+      "contactId": <number or null if new contact>,
+      "contactName": "Name mentioned",
+      "changes": {
+        "lastContactedDate": "YYYY-MM-DD or null",
+        "nextStep": "follow up action or null",
+        "nextStepDate": "YYYY-MM-DD or null",
+        "strength": "New/Weak/Medium/Strong or null"
+      },
+      "explanation": "Brief explanation of what will be updated"
+    }
+  ]
+}
+
+RULES:
+- Match names flexibly (first name only, partial match, etc.)
+- "spoke to X" or "talked to X" or "met X" → set lastContactedDate to today
+- "follow up with X by Friday" → set nextStep and nextStepDate
+- "reach out to X next week" → set nextStep and calculate nextStepDate
+- If multiple contacts mentioned, include multiple updates
+- If contact not found, set contactId to null (will show warning)
+
+Return ONLY valid JSON.`;
+
+        const response = await fetch(ANTHROPIC_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': state.apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('API error: ' + response.status);
+        }
+
+        const data = await response.json();
+        const content = data.content?.[0]?.text;
+
+        if (!content) {
+          throw new Error('No response from AI');
+        }
+
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('Could not parse response');
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+
+        if (!parsed.updates || parsed.updates.length === 0) {
+          state.processing = null;
+          showToast('Could not understand the update. Try being more specific.');
+          render();
+          return;
+        }
+
+        // Store pending CRM updates and show confirmation
+        state.pendingCrmUpdates = parsed.updates;
+        state.processing = null;
+        state.modal = { type: 'confirmCrmUpdates' };
+        input.value = '';
+        render();
+
+      } catch (err) {
+        console.error('Quick CRM update error:', err);
+        state.processing = { status: 'error', message: 'Error: ' + err.message };
+        render();
+      }
+    }
+
+    function confirmCrmUpdates() {
+      const updates = state.pendingCrmUpdates || [];
+      let applied = 0;
+
+      updates.forEach(update => {
+        if (update.contactId) {
+          const contact = state.contacts.find(c => c.id === update.contactId);
+          if (contact && update.changes) {
+            if (update.changes.lastContactedDate) contact.lastContactedDate = update.changes.lastContactedDate;
+            if (update.changes.nextStep) contact.nextStep = update.changes.nextStep;
+            if (update.changes.nextStepDate) contact.nextStepDate = update.changes.nextStepDate;
+            if (update.changes.strength) contact.strength = update.changes.strength;
+            applied++;
+          }
+        }
+      });
+
+      saveData();
+      state.pendingCrmUpdates = [];
+      closeModal();
+      showToast('Updated ' + applied + ' contact(s)');
+    }
+
+    function cancelCrmUpdates() {
+      state.pendingCrmUpdates = [];
+      closeModal();
     }
 
     function togglePendingContact(tempId) {
@@ -2601,6 +2771,36 @@ Include all fields you can determine from the search.`;
           '</div></div></div>';
       }
 
+      if (state.modal.type === 'confirmCrmUpdates') {
+        const updates = state.pendingCrmUpdates || [];
+        const validUpdates = updates.filter(u => u.contactId);
+        const invalidUpdates = updates.filter(u => !u.contactId);
+
+        return '<div class="modal-overlay" onclick="cancelCrmUpdates()"><div class="modal" style="max-width:500px" onclick="event.stopPropagation()">' +
+          '<h3>💬 Confirm CRM Updates</h3>' +
+          (invalidUpdates.length ? '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#f87171">' +
+            '⚠️ Could not find: ' + invalidUpdates.map(u => '<strong>' + escapeHtml(u.contactName) + '</strong>').join(', ') +
+            '</div>' : '') +
+          '<div style="max-height:300px;overflow-y:auto">' +
+          validUpdates.map(update => {
+            const contact = state.contacts.find(c => c.id === update.contactId);
+            return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px">' +
+              '<div style="font-weight:600;margin-bottom:6px">' + escapeHtml(contact ? contact.name : update.contactName) + '</div>' +
+              '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' + escapeHtml(update.explanation) + '</div>' +
+              '<div style="font-size:11px;display:flex;flex-wrap:wrap;gap:6px">' +
+              (update.changes.lastContactedDate ? '<span style="background:rgba(74,222,128,0.15);color:var(--accent);padding:2px 8px;border-radius:10px">Last contacted: ' + update.changes.lastContactedDate + '</span>' : '') +
+              (update.changes.nextStep ? '<span style="background:rgba(96,165,250,0.15);color:#60a5fa;padding:2px 8px;border-radius:10px">Next: ' + escapeHtml(update.changes.nextStep) + '</span>' : '') +
+              (update.changes.nextStepDate ? '<span style="background:rgba(251,191,36,0.15);color:#fbbf24;padding:2px 8px;border-radius:10px">Due: ' + update.changes.nextStepDate + '</span>' : '') +
+              (update.changes.strength ? '<span style="background:rgba(168,85,247,0.15);color:#a855f7;padding:2px 8px;border-radius:10px">Strength: ' + update.changes.strength + '</span>' : '') +
+              '</div></div>';
+          }).join('') +
+          '</div>' +
+          '<div class="modal-actions">' +
+          '<button class="btn btn-secondary" onclick="cancelCrmUpdates()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="confirmCrmUpdates()"' + (validUpdates.length === 0 ? ' disabled' : '') + '>Apply ' + validUpdates.length + ' Update(s)</button>' +
+          '</div></div></div>';
+      }
+
       return '';
     }
 
@@ -2720,6 +2920,15 @@ Include all fields you can determine from the search.`;
           '<button class="process-btn" onclick="processBrainDump()"' + (!canProcess ? ' disabled' : '') + '>✨ Process' + (hasBraindumpImages ? ' with OCR' : '') + '</button>' +
           '</div>' +
           processingHtml +
+
+          // Quick CRM update section
+          '<div style="border-top:1px solid var(--border);margin-top:24px;padding-top:24px">' +
+          '<h3 style="font-size:14px;margin-bottom:8px">💬 Quick CRM Update</h3>' +
+          '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Natural language updates: "spoke to David today" or "follow up with Sarah next Tuesday"</p>' +
+          '<div style="display:flex;gap:8px">' +
+          '<input type="text" id="quickCrmInput" style="flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text-primary);font-size:13px" placeholder="e.g., spoke to John Smith, need to call Sarah by Friday...">' +
+          '<button class="btn btn-primary btn-sm" onclick="processQuickCrmUpdate()"' + (!canProcess ? ' disabled' : '') + '>Update</button>' +
+          '</div></div>' +
 
           // Contact scanning section (images OR text)
           '<div style="border-top:1px solid var(--border);margin-top:24px;padding-top:24px">' +
