@@ -1958,17 +1958,23 @@ If no contacts are found, return {"contacts": [], "summary": "No contacts found"
           const searchResults = await searchForPerson(contact.name, contact.company);
 
           if (searchResults && searchResults.length > 0) {
-            // Send to Claude for enrichment
-            const enrichPrompt = `Based on these search results about "${contact.name}", extract professional info.
+            // Send to Claude for enrichment - correct OCR errors and add missing info
+            const enrichPrompt = `Based on these search results, CORRECT and ENRICH this contact's info.
 
-Search results:
+Search results for "${contact.name}":
 ${searchResults.map(r => '- ' + r.title + ': ' + r.description).join('\n')}
 
-Current info: ${JSON.stringify(contact)}
+Current info (may have OCR errors/misspellings): ${JSON.stringify(contact)}
 
-Return ONLY JSON with any additional info:
-{"company": "...", "role": "...", "geoTags": [], "secTags": []}
-Only include fields you're confident about.`;
+IMPORTANT:
+1. CORRECT any misspelled names or company names based on search results
+2. Add the person's location/geography to geoTags (country, region)
+3. Add their industry/sector to secTags
+4. Find their correct job title/role
+
+Return ONLY JSON with corrected and enriched info:
+{"name": "Corrected Full Name", "company": "Correct Company Name", "role": "Job Title", "geoTags": ["Country", "Region"], "secTags": ["Industry"]}
+Include ALL fields with your best information from the search.`;
 
             try {
               const enrichResponse = await fetch(ANTHROPIC_API_URL, {
@@ -1993,8 +1999,10 @@ Only include fields you're confident about.`;
                   const enrichMatch = enrichContent.match(/\{[\s\S]*\}/);
                   if (enrichMatch) {
                     const enriched = JSON.parse(enrichMatch[0]);
-                    if (enriched.company && !contact.company) contact.company = enriched.company;
-                    if (enriched.role && !contact.role) contact.role = enriched.role;
+                    // OVERRIDE with corrected/enriched data (not just fill empty)
+                    if (enriched.name) contact.name = enriched.name;
+                    if (enriched.company) contact.company = enriched.company;
+                    if (enriched.role) contact.role = enriched.role;
                     if (enriched.geoTags?.length) contact.geoTags = [...new Set([...(contact.geoTags || []), ...enriched.geoTags])];
                     if (enriched.secTags?.length) contact.secTags = [...new Set([...(contact.secTags || []), ...enriched.secTags])];
                   }
@@ -2022,6 +2030,145 @@ Only include fields you're confident about.`;
 
       } catch (err) {
         console.error('Image processing error:', err);
+        state.processing = { status: 'error', message: 'Error: ' + err.message };
+        render();
+      }
+    }
+
+    // Process text list of contacts (names pasted in)
+    async function processTextContacts() {
+      const input = document.getElementById('contactNamesInput');
+      const text = input ? input.value.trim() : '';
+
+      if (!text) {
+        showToast('Paste some names first');
+        return;
+      }
+
+      if (!state.apiKey || !state.braveApiKey) {
+        showToast('Set both API keys in Settings first');
+        return;
+      }
+
+      state.processing = { status: 'processing', message: 'Parsing names...' };
+      render();
+
+      try {
+        // Parse names from text (handle various formats)
+        const lines = text.split(/[\n,]+/).map(l => l.trim()).filter(l => l.length > 0);
+        const extractedContacts = [];
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Try to extract name and company from various formats:
+          // "John Smith, Acme Corp" or "John Smith - Acme" or "John Smith (Acme)"
+          let name = line;
+          let company = '';
+
+          const dashMatch = line.match(/^(.+?)\s*[-–—]\s*(.+)$/);
+          const parenMatch = line.match(/^(.+?)\s*\((.+?)\)$/);
+          const commaMatch = line.match(/^(.+?),\s*(.+)$/);
+
+          if (dashMatch) {
+            name = dashMatch[1].trim();
+            company = dashMatch[2].trim();
+          } else if (parenMatch) {
+            name = parenMatch[1].trim();
+            company = parenMatch[2].trim();
+          } else if (commaMatch && !commaMatch[2].match(/^\d/)) { // Avoid splitting "John Smith, Jr"
+            name = commaMatch[1].trim();
+            company = commaMatch[2].trim();
+          }
+
+          extractedContacts.push({
+            name: name,
+            company: company,
+            role: '',
+            geoTags: [],
+            secTags: [],
+            _tempId: 'text_' + i
+          });
+        }
+
+        if (extractedContacts.length === 0) {
+          state.processing = { status: 'done', message: 'No names found' };
+          render();
+          return;
+        }
+
+        // Enrich each contact with web search
+        state.processing = { status: 'processing', message: 'Enriching ' + extractedContacts.length + ' contacts...' };
+        render();
+
+        for (let i = 0; i < extractedContacts.length; i++) {
+          const contact = extractedContacts[i];
+          state.processing = { status: 'processing', message: 'Looking up ' + contact.name + '... (' + (i+1) + '/' + extractedContacts.length + ')' };
+          render();
+
+          const searchResults = await searchForPerson(contact.name, contact.company);
+
+          if (searchResults && searchResults.length > 0) {
+            const enrichPrompt = `Based on these search results, find info about "${contact.name}".
+
+Search results:
+${searchResults.map(r => '- ' + r.title + ': ' + r.description).join('\n')}
+
+Return ONLY JSON with the person's info:
+{"name": "Full Name", "company": "Company", "role": "Job Title", "geoTags": ["Country"], "secTags": ["Industry"]}
+Include all fields you can determine from the search.`;
+
+            try {
+              const enrichResponse = await fetch(ANTHROPIC_API_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-api-key': state.apiKey,
+                  'anthropic-version': '2023-06-01',
+                  'anthropic-dangerous-direct-browser-access': 'true'
+                },
+                body: JSON.stringify({
+                  model: 'claude-sonnet-4-20250514',
+                  max_tokens: 500,
+                  messages: [{ role: 'user', content: enrichPrompt }]
+                })
+              });
+
+              if (enrichResponse.ok) {
+                const enrichData = await enrichResponse.json();
+                const enrichContent = enrichData.content?.[0]?.text;
+                if (enrichContent) {
+                  const enrichMatch = enrichContent.match(/\{[\s\S]*\}/);
+                  if (enrichMatch) {
+                    const enriched = JSON.parse(enrichMatch[0]);
+                    if (enriched.name) contact.name = enriched.name;
+                    if (enriched.company) contact.company = enriched.company;
+                    if (enriched.role) contact.role = enriched.role;
+                    if (enriched.geoTags?.length) contact.geoTags = enriched.geoTags;
+                    if (enriched.secTags?.length) contact.secTags = enriched.secTags;
+                  }
+                }
+              }
+            } catch (enrichErr) {
+              console.error('Enrichment error:', enrichErr);
+            }
+          }
+
+          // Check if contact already exists
+          const existing = state.contacts.find(c => c.name.toLowerCase() === contact.name.toLowerCase());
+          contact._isUpdate = !!existing;
+          contact._existingId = existing?.id;
+        }
+
+        // Show confirmation modal
+        state.pendingContacts = extractedContacts;
+        state.selectedPendingContacts = new Set(extractedContacts.map(c => c._tempId));
+        state.processing = null;
+        state.modal = { type: 'confirmContacts' };
+        input.value = ''; // Clear input
+        render();
+
+      } catch (err) {
+        console.error('Text contact processing error:', err);
         state.processing = { status: 'error', message: 'Error: ' + err.message };
         render();
       }
@@ -2341,8 +2488,16 @@ Only include fields you're confident about.`;
     }
 
     function render() {
+      // Preserve ALL scroll positions
       const kanban = document.querySelector('.kanban-container');
-      const scrollPos = kanban ? kanban.scrollLeft : 0;
+      const kanbanScrollLeft = kanban ? kanban.scrollLeft : 0;
+      const windowScrollY = window.scrollY;
+      const todaySection = document.querySelector('.today-section');
+      const todaySectionScroll = todaySection ? todaySection.scrollTop : 0;
+      const crmContainer = document.querySelector('.crm-container');
+      const crmScroll = crmContainer ? crmContainer.scrollTop : 0;
+      const contactList = document.querySelector('.contact-list');
+      const contactListScroll = contactList ? contactList.scrollTop : 0;
 
       // Preserve search input focus and cursor position
       const activeEl = document.activeElement;
@@ -2449,14 +2604,27 @@ Only include fields you're confident about.`;
           '</div>' +
           processingHtml +
 
-          // Image drop zone for contact scanning (separate feature)
+          // Contact scanning section (images OR text)
           '<div style="border-top:1px solid var(--border);margin-top:24px;padding-top:24px">' +
-          '<h3 style="font-size:14px;margin-bottom:8px">📇 Scan Contacts from Images</h3>' +
-          '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">LinkedIn profiles, business cards, contact lists → enriched with web search</p>' +
+          '<h3 style="font-size:14px;margin-bottom:8px">📇 Add & Enrich Contacts</h3>' +
+          '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Paste names/companies OR upload images → auto-enriched with web search</p>' +
+
+          // Text input for contact names
+          '<textarea id="contactNamesInput" style="width:100%;min-height:80px;margin-bottom:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text-primary);font-size:13px;resize:vertical" placeholder="Paste names here (one per line or comma-separated):\nJohn Smith, Acme Corp\nJane Doe - Google\nBob Johnson"></textarea>' +
+          '<button class="btn btn-primary btn-sm" style="margin-bottom:16px" onclick="processTextContacts()"' + (!canScanContacts ? ' disabled' : '') + '>🔍 Look Up & Enrich Names</button>' +
+
+          // OR divider
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">' +
+          '<div style="flex:1;height:1px;background:var(--border)"></div>' +
+          '<span style="font-size:11px;color:var(--text-muted)">OR upload images</span>' +
+          '<div style="flex:1;height:1px;background:var(--border)"></div>' +
+          '</div>' +
+
+          // Image upload
           '<div class="image-drop-zone" id="imageDropZone" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleImageDrop(event)" onclick="document.getElementById(\'imageFileInput\').click()">' +
           '<div class="image-drop-zone-icon">📸</div>' +
           '<div class="image-drop-zone-text">Drop images here or click to upload</div>' +
-          '<div class="image-drop-zone-hint">PNG, JPG, WEBP supported</div>' +
+          '<div class="image-drop-zone-hint">LinkedIn, business cards, contact lists</div>' +
           '</div>' +
           '<input type="file" id="imageFileInput" accept="image/*" multiple style="display:none" onchange="handleImageSelect(event)">' +
 
@@ -2579,10 +2747,35 @@ Only include fields you're confident about.`;
         renderModal() +
         (state.toast ? '<div class="toast">' + escapeHtml(state.toast) + '</div>' : ''); 
       
-      if (scrollPos) {
-        const newKanban = document.querySelector('.kanban-container');
-        if (newKanban) requestAnimationFrame(() => { newKanban.scrollLeft = scrollPos; });
-      }
+      // Restore ALL scroll positions
+      requestAnimationFrame(() => {
+        // Restore window scroll
+        window.scrollTo(0, windowScrollY);
+
+        // Restore kanban horizontal scroll
+        if (kanbanScrollLeft) {
+          const newKanban = document.querySelector('.kanban-container');
+          if (newKanban) newKanban.scrollLeft = kanbanScrollLeft;
+        }
+
+        // Restore today section scroll
+        if (todaySectionScroll) {
+          const newTodaySection = document.querySelector('.today-section');
+          if (newTodaySection) newTodaySection.scrollTop = todaySectionScroll;
+        }
+
+        // Restore CRM scroll
+        if (crmScroll) {
+          const newCrmContainer = document.querySelector('.crm-container');
+          if (newCrmContainer) newCrmContainer.scrollTop = crmScroll;
+        }
+
+        // Restore contact list scroll
+        if (contactListScroll) {
+          const newContactList = document.querySelector('.contact-list');
+          if (newContactList) newContactList.scrollTop = contactListScroll;
+        }
+      });
 
       // Restore search input focus and cursor position
       if (wasSearchFocused) {
