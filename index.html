@@ -192,6 +192,16 @@
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
     .checklist-editor { margin-bottom: 12px; }
     .checklist-editor-title { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; }
+    /* Linked contacts in task modal */
+    .linked-contacts-picker { margin-bottom: 12px; }
+    .linked-contacts-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 120px; overflow-y: auto; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border); }
+    .contact-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 16px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
+    .contact-chip:hover { background: rgba(255,255,255,0.08); }
+    .contact-chip.selected { background: var(--accent); color: #000; border-color: var(--accent); }
+    .contact-chip .check { font-size: 10px; }
+    /* Linked contacts on task cards */
+    .task-linked-contacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .task-contact-chip { font-size: 9px; padding: 2px 6px; background: rgba(96, 165, 250, 0.15); color: #60a5fa; border-radius: 10px; }
     .checklist-edit-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 4px; margin-bottom: 4px; }
     .checklist-edit-item input[type="checkbox"] { accent-color: var(--accent); }
     .checklist-edit-item span { flex: 1; font-size: 12px; }
@@ -401,6 +411,7 @@
       expandedTasks: new Set(),
       modal: null,
       modalChecklist: [],
+      modalLinkedContacts: [],
       newChecklistText: '',
       toast: null,
       apiKey: '',
@@ -886,27 +897,39 @@
     }
 
     // Modals
-    function openAddTaskModal(b) { 
-      state.modal = { type: 'addTask', bucket: b }; 
+    function openAddTaskModal(b) {
+      state.modal = { type: 'addTask', bucket: b };
       state.modalChecklist = [];
+      state.modalLinkedContacts = [];
       state.newChecklistText = '';
-      render(); 
+      render();
     }
-    
-    function openEditTaskModal(id) { 
-      const t = state.tasks.find(x => x.id === id); 
-      if (t) { 
-        state.modal = { type: 'editTask', task: JSON.parse(JSON.stringify(t)) }; 
+
+    function openEditTaskModal(id) {
+      const t = state.tasks.find(x => x.id === id);
+      if (t) {
+        state.modal = { type: 'editTask', task: JSON.parse(JSON.stringify(t)) };
         state.modalChecklist = [...(t.checklist || [])];
+        state.modalLinkedContacts = [...(t.linkedContacts || [])];
         state.newChecklistText = '';
-        render(); 
-      } 
+        render();
+      }
     }
-    
+
     function openAddContactModal() { state.modal = { type: 'addContact' }; render(); }
     function openEditContactModal(id) { const c = state.contacts.find(x => x.id === id); if (c) { state.modal = { type: 'editContact', contact: JSON.parse(JSON.stringify(c)) }; render(); } }
     function openSettingsModal() { state.modal = { type: 'settings' }; render(); }
-    function closeModal() { state.modal = null; state.modalChecklist = []; state.newChecklistText = ''; render(); }
+    function closeModal() { state.modal = null; state.modalChecklist = []; state.modalLinkedContacts = []; state.newChecklistText = ''; render(); }
+
+    function toggleLinkedContact(contactId) {
+      const idx = state.modalLinkedContacts.indexOf(contactId);
+      if (idx >= 0) {
+        state.modalLinkedContacts.splice(idx, 1);
+      } else {
+        state.modalLinkedContacts.push(contactId);
+      }
+      render();
+    }
 
     // Checklist editing in modal
     function addChecklistItem() {
@@ -934,34 +957,36 @@
       render();
     }
 
-    function saveTask() { 
-      const title = document.getElementById('taskTitle').value.trim(); 
-      if (!title) return; 
-      
-      if (state.modal.type === 'addTask') { 
-        state.tasks.push({ 
-          id: getNextId(state.tasks), 
-          title, 
-          bucket: state.modal.bucket, 
-          checklist: [...state.modalChecklist], 
-          dueDate: document.getElementById('taskDueDate').value || '', 
-          status: document.getElementById('taskStatus').value || 'todo', 
-          notes: document.getElementById('taskNotes') ? document.getElementById('taskNotes').value : '' 
-        }); 
-      } else { 
-        const t = state.tasks.find(x => x.id === state.modal.task.id); 
-        if (t) { 
-          t.title = title; 
-          t.bucket = document.getElementById('taskBucket').value; 
+    function saveTask() {
+      const title = document.getElementById('taskTitle').value.trim();
+      if (!title) return;
+
+      if (state.modal.type === 'addTask') {
+        state.tasks.push({
+          id: getNextId(state.tasks),
+          title,
+          bucket: state.modal.bucket,
+          checklist: [...state.modalChecklist],
+          linkedContacts: [...state.modalLinkedContacts],
+          dueDate: document.getElementById('taskDueDate').value || '',
+          status: document.getElementById('taskStatus').value || 'todo',
+          notes: document.getElementById('taskNotes') ? document.getElementById('taskNotes').value : ''
+        });
+      } else {
+        const t = state.tasks.find(x => x.id === state.modal.task.id);
+        if (t) {
+          t.title = title;
+          t.bucket = document.getElementById('taskBucket').value;
           t.checklist = [...state.modalChecklist];
-          t.dueDate = document.getElementById('taskDueDate').value || ''; 
-          t.status = document.getElementById('taskStatus').value; 
+          t.linkedContacts = [...state.modalLinkedContacts];
+          t.dueDate = document.getElementById('taskDueDate').value || '';
+          t.status = document.getElementById('taskStatus').value;
           t.notes = document.getElementById('taskNotes') ? document.getElementById('taskNotes').value : '';
-        } 
-      } 
-      saveData(); 
-      closeModal(); 
-      showToast('Task saved!'); 
+        }
+      }
+      saveData();
+      closeModal();
+      showToast('Task saved!');
     }
     
     function deleteTask() {
@@ -2325,6 +2350,7 @@ Include all fields you can determine from the search.`;
       const checklistDone = checklist.filter(i => i.startsWith('[x] ')).length;
       const escapedBucket = escapeAttr(t.bucket).replace(/'/g, "\\'");
       const isDone = t.status === 'done';
+      const linkedContacts = (t.linkedContacts || []).map(cid => state.contacts.find(c => c.id === cid)).filter(c => c);
 
       return '<div class="task-card ' + escapeAttr(t.status) + '" draggable="true" ondragstart="handleDragStart(event,' + t.id + ')" ondragend="handleDragEnd(event)" ondragover="handleTaskDragOver(event,' + t.id + ')" ondrop="handleTaskDrop(event,' + t.id + ',\'' + escapedBucket + '\')" ondblclick="openEditTaskModal(' + t.id + ')">' +
         '<div class="task-header">' +
@@ -2338,6 +2364,7 @@ Include all fields you can determine from the search.`;
           const text = d ? item.replace('[x] ', '') : item;
           return '<div class="checklist-item ' + (d ? 'completed' : '') + '" onclick="toggleChecklistItem(' + t.id + ',' + idx + ',event)"><input type="checkbox" ' + (d ? 'checked' : '') + '><span class="' + (d ? 'done' : '') + '">' + escapeHtml(text) + '</span></div>';
         }).join('') + '</div>' : '') +
+        (linkedContacts.length ? '<div class="task-linked-contacts">' + linkedContacts.map(c => '<span class="task-contact-chip" onclick="event.stopPropagation();openEditContactModal(' + c.id + ')">' + escapeHtml(c.name.split(' ')[0]) + '</span>').join('') + '</div>' : '') +
         '<div class="task-footer">' +
         (checklist.length ? '<span class="task-meta">✓ ' + checklistDone + '/' + checklist.length + '</span>' : '') +
         (t.dueDate ? '<span class="due-date ' + (isOverdue(t.dueDate) ? 'overdue' : '') + '">📅 ' + formatDate(t.dueDate) + '</span>' : '') +
@@ -2460,6 +2487,20 @@ Include all fields you can determine from the search.`;
             '</div>';
         }).join('');
 
+        // Generate linked contacts picker HTML
+        const linkedContactsHtml = state.contacts.length > 0 ?
+          '<div class="linked-contacts-picker">' +
+          '<div class="checklist-editor-title">Link Contacts</div>' +
+          '<div class="linked-contacts-list">' +
+          state.contacts.map(c => {
+            const isSelected = state.modalLinkedContacts.includes(c.id);
+            return '<span class="contact-chip ' + (isSelected ? 'selected' : '') + '" onclick="toggleLinkedContact(' + c.id + ')">' +
+              (isSelected ? '<span class="check">✓</span>' : '') +
+              escapeHtml(c.name) +
+              '</span>';
+          }).join('') +
+          '</div></div>' : '';
+
         return '<div class="modal-overlay" onclick="closeModal()"><div class="modal" onclick="event.stopPropagation()">' +
           '<h3>' + (isEdit ? 'Edit' : 'Add') + ' Task</h3>' +
           '<label>Title</label>' +
@@ -2475,6 +2516,7 @@ Include all fields you can determine from the search.`;
           '<option value="urgent"' + (t.status === 'urgent' ? ' selected' : '') + '>Urgent</option>' +
           '<option value="done"' + (t.status === 'done' ? ' selected' : '') + '>Done</option>' +
           '</select>' +
+          linkedContactsHtml +
           '<div class="checklist-editor">' +
           '<div class="checklist-editor-title">Checklist Items</div>' +
           checklistHtml +
